@@ -44,7 +44,7 @@ void main() {
       manager.addTableListener('table2', (_, __) => otherTableCallCount++);
 
       manager.notifyChange('table1');
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(tableCallCount, 1);
@@ -60,7 +60,7 @@ void main() {
       manager.removeTableListener('table1', listener);
 
       manager.notifyChange('table1');
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(callCount, 0);
@@ -75,7 +75,7 @@ void main() {
       manager.addTableListener('table1', (_, __) => tableCallCount++);
 
       manager.notifyChange('table1');
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(globalCallCount, 1);
@@ -88,7 +88,7 @@ void main() {
       manager.addTableListener('table1', (_, isRemote) => wasRemote = isRemote);
 
       manager.notifyChange('table1', isRemote: true);
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(wasRemote, true);
@@ -106,7 +106,7 @@ void main() {
 
       manager.notifySync();
       manager.notifyChange('table1');
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(globalCallCount, 0);
@@ -122,7 +122,7 @@ void main() {
       manager.notifyChange('table1');
       manager.notifyChange('table1');
       manager.notifyChange('table1');
-      
+
       // Wait for debounce timer
       Future.delayed(const Duration(milliseconds: 150), () {
         expect(callCount, 1);

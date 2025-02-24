@@ -29,10 +29,11 @@ void main() {
       await DeviceStateManager.createDeviceStateTable(db);
 
       // Verify table structure
-      final tableInfo = await db.rawQuery('PRAGMA table_info(__pocketsync_device_state)');
-      
+      final tableInfo =
+          await db.rawQuery('PRAGMA table_info(__pocketsync_device_state)');
+
       expect(tableInfo.length, 3); // Should have 3 columns
-      
+
       // Verify column names and types
       expect(tableInfo[0]['name'], 'id');
       expect(tableInfo[0]['type'], 'INTEGER');
@@ -68,12 +69,13 @@ void main() {
       await DeviceStateManager.updateLastSyncTimestamp(db, timestamp);
 
       final result = await db.query('__pocketsync_device_state');
-      expect(result.first['last_sync_timestamp'], timestamp.millisecondsSinceEpoch);
+      expect(result.first['last_sync_timestamp'],
+          timestamp.millisecondsSinceEpoch);
     });
 
     test('getDeviceState returns null when no state exists', () async {
       await DeviceStateManager.createDeviceStateTable(db);
-      
+
       final state = await DeviceStateManager.getDeviceState(db);
       expect(state, isNull);
     });
@@ -81,12 +83,12 @@ void main() {
     test('getDeviceState returns correct state', () async {
       // Setup device info
       await DeviceStateManager.setupDeviceInfo(db);
-      
+
       final timestamp = DateTime(2023, 1, 1, 12, 0);
       await DeviceStateManager.updateLastSyncTimestamp(db, timestamp);
 
       final state = await DeviceStateManager.getDeviceState(db);
-      
+
       expect(state, isNotNull);
       expect(state!['device_id'], isNotNull);
       expect(state['last_sync_timestamp'], timestamp.millisecondsSinceEpoch);

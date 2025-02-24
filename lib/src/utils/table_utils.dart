@@ -6,7 +6,8 @@ Set<String> extractAffectedTables(String sql) {
   sql = sql.toLowerCase();
 
   // Extract temporary table names from WITH clauses
-  final withPattern = RegExp(r'with\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(', caseSensitive: false);
+  final withPattern = RegExp(r'with\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(',
+      caseSensitive: false);
   for (final match in withPattern.allMatches(sql)) {
     if (match.group(1) != null) {
       tempTables.add(match.group(1)!);

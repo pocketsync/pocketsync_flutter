@@ -1,3 +1,7 @@
+## 0.0.12
+- Add: Unit tests
+- Change: Package is now moved to its own repository and open sourced
+
 ## 0.0.11
 - Fix: Weird behaviour when using pocketsync on a project already using sqflite
 - Fix: Changes insertion was causing an issue for some scenarios

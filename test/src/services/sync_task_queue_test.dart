@@ -28,7 +28,8 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 150));
 
       expect(processedChanges.length, 1);
-      expect(processedChanges.first.insertions.changes, changes.insertions.changes);
+      expect(processedChanges.first.insertions.changes,
+          changes.insertions.changes);
     });
 
     test('debounces multiple tasks', () async {

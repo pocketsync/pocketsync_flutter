@@ -40,13 +40,15 @@ void main() {
     });
 
     test('should handle case insensitive SQL statements', () {
-      final sql = 'select * FROM Users JOIN Orders on Users.id = Orders.user_id';
+      final sql =
+          'select * FROM Users JOIN Orders on Users.id = Orders.user_id';
       final tables = extractAffectedTables(sql);
       expect(tables, equals({'users', 'orders'}));
     });
 
     test('should handle multiple occurrences of same table', () {
-      final sql = 'SELECT * FROM products WHERE id IN (SELECT product_id FROM products)';
+      final sql =
+          'SELECT * FROM products WHERE id IN (SELECT product_id FROM products)';
       final tables = extractAffectedTables(sql);
       expect(tables, equals({'products'}));
     });
