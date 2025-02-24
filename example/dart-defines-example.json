@@ -1,0 +1,5 @@
+{
+    "PS_PROJECT_ID": "<your project id>",
+    "PS_SERVER_URL": "https://api.pocketsync.dev",
+    "PS_AUTH_TOKEN": "<your auth token>"
+}
