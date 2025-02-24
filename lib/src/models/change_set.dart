@@ -27,6 +27,37 @@ class Row {
       data: json['data'] as Map<String, dynamic>,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! Row) return false;
+
+    return primaryKey == other.primaryKey &&
+        timestamp == other.timestamp &&
+        version == other.version &&
+        _mapsAreEqual(data, other.data);
+  }
+
+  bool _mapsAreEqual(Map<String, dynamic> map1, Map<String, dynamic> map2) {
+    if (identical(map1, map2)) return true;
+    if (map1.length != map2.length) return false;
+
+    for (final key in map1.keys) {
+      if (!map2.containsKey(key)) return false;
+      if (map1[key] != map2[key]) return false;
+    }
+
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(primaryKey, timestamp, version, data);
+
+  @override
+  String toString() {
+    return 'Row{primaryKey: $primaryKey, timestamp: $timestamp, version: $version, data: $data}';
+  }
 }
 
 class TableRows {
@@ -48,6 +79,27 @@ class TableRows {
         ),
       ),
     );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TableRows) return false;
+    if (rows.length != other.rows.length) return false;
+
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] != other.rows[i]) return false;
+    }
+
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(rows);
+
+  @override
+  String toString() {
+    return 'TableRows{rows: $rows}';
   }
 }
 
@@ -71,6 +123,25 @@ class TableChanges {
       ),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TableChanges) return false;
+    if (changes.length != other.changes.length) return false;
+
+    for (final key in changes.keys) {
+      if (!other.changes.containsKey(key) ||
+          changes[key] != other.changes[key]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  @override
+  int get hashCode => changes.hashCode;
 }
 
 class ChangeSet {
@@ -131,4 +202,28 @@ class ChangeSet {
       insertions.changes.isNotEmpty ||
       updates.changes.isNotEmpty ||
       deletions.changes.isNotEmpty;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ChangeSet &&
+        other.timestamp == timestamp &&
+        other.version == version &&
+        other.insertions == insertions &&
+        other.updates == updates &&
+        other.deletions == deletions &&
+        other.localChangeIds == localChangeIds &&
+        other.serverChangeIds == serverChangeIds;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        timestamp,
+        version,
+        insertions,
+        updates,
+        deletions,
+        localChangeIds,
+        serverChangeIds,
+      );
 }

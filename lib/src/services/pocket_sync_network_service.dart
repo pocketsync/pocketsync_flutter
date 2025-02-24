@@ -54,9 +54,7 @@ class PocketSyncNetworkService {
     _socket = null;
   }
 
-  void reconnect() {
-    _connectWebSocket();
-  }
+  void reconnect() => _connectWebSocket();
 
   void _connectWebSocket() {
     if (_userId == null || _deviceId == null) {

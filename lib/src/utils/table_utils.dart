@@ -1,8 +1,17 @@
 Set<String> extractAffectedTables(String sql) {
   final Set<String> tables = {};
+  final Set<String> tempTables = {};
 
   // Convert to lowercase for easier matching
   sql = sql.toLowerCase();
+
+  // Extract temporary table names from WITH clauses
+  final withPattern = RegExp(r'with\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s*\(', caseSensitive: false);
+  for (final match in withPattern.allMatches(sql)) {
+    if (match.group(1) != null) {
+      tempTables.add(match.group(1)!);
+    }
+  }
 
   // Regular expressions for common SQL patterns
   final patterns = [
@@ -25,7 +34,11 @@ Set<String> extractAffectedTables(String sql) {
   void extractTables(RegExp pattern) {
     for (final match in pattern.allMatches(sql)) {
       if (match.group(1) != null) {
-        tables.add(match.group(1)!);
+        final tableName = match.group(1)!;
+        // Only add if it's not a temporary table
+        if (!tempTables.contains(tableName)) {
+          tables.add(tableName);
+        }
       }
     }
   }

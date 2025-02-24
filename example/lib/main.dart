@@ -13,7 +13,7 @@ void main() async {
   const serverUrl = String.fromEnvironment('PS_SERVER_URL',
       defaultValue: 'https://api.pocketsync.dev');
 
-  // Server url for local backend:
+  // Server url for local backend on Android emulator / iOS simulator:
   // serverUrl: defaultTargetPlatform == TargetPlatform.android ? 'http://10.0.2.2:3000' : 'http://127.0.0.1:3000'
 
   await PocketSync.instance.initialize(

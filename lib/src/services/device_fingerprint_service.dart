@@ -6,11 +6,12 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 class DeviceFingerprintService {
-  final Database database;
+  const DeviceFingerprintService();
 
-  DeviceFingerprintService(this.database);
-
-  static Future<String> getDeviceFingerprint(Database database) async {
+  static Future<String> getDeviceFingerprint(
+    Database database,
+    DeviceInfoPlugin deviceInfo,
+  ) async {
     final deviceState =
         await database.query('__pocketsync_device_state', limit: 1);
 
@@ -18,7 +19,6 @@ class DeviceFingerprintService {
       return deviceState.first['device_id'] as String;
     }
 
-    final deviceInfo = DeviceInfoPlugin();
     final fingerprintData = <String>[];
 
     if (Platform.isAndroid) {

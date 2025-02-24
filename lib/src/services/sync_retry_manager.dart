@@ -23,10 +23,9 @@ class SyncRetryManager {
       }
 
       final delay = _calculateDelay();
-      _attempts++;
-
       _retryTimer?.cancel();
       _retryTimer = Timer(delay, () => executeWithRetry(syncOperation));
+      _attempts++;
     } finally {
       _isRetrying = false;
     }

@@ -17,11 +17,11 @@ class PocketSyncDatabaseInitializer {
       );
 
       -- Create indexes for optimizing queries
-      CREATE INDEX idx_pocketsync_changes_synced ON __pocketsync_changes(synced);
-      CREATE INDEX idx_pocketsync_changes_version ON __pocketsync_changes(version);
-      CREATE INDEX idx_pocketsync_changes_timestamp ON __pocketsync_changes(timestamp);
-      CREATE INDEX idx_pocketsync_changes_table_name ON __pocketsync_changes(table_name);
-      CREATE INDEX idx_pocketsync_changes_record_rowid ON __pocketsync_changes(record_rowid)
+      CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_synced ON __pocketsync_changes(synced);
+      CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_version ON __pocketsync_changes(version);
+      CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_timestamp ON __pocketsync_changes(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_table_name ON __pocketsync_changes(table_name);
+      CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_record_rowid ON __pocketsync_changes(record_rowid)
     ''');
 
     await db.execute('''

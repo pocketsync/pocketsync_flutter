@@ -1,3 +1,4 @@
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:pocketsync_flutter/src/services/device_fingerprint_service.dart';
 
@@ -24,7 +25,10 @@ class DeviceStateManager {
     final deviceState = await db.query(_tableName, limit: 1);
     if (deviceState.isEmpty) {
       // Generate a new device ID if none exists
-      final deviceId = await DeviceFingerprintService.getDeviceFingerprint(db);
+      final deviceId = await DeviceFingerprintService.getDeviceFingerprint(
+        db,
+        DeviceInfoPlugin(),
+      );
       await db.insert(_tableName, {
         'device_id': deviceId,
         'last_sync_timestamp': null,
