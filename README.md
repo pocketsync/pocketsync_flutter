@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://pocketsync.dev">Website</a> ·
   <a href="https://docs.pocketsync.dev">Documentation</a> ·
-  <a href="https://x.com/nossesteve">Report Bug</a>
+  <a href="https://github.com/pocketsync/pocketsync_flutter/issues">Report Bug</a>
 </p>
 
 ---
