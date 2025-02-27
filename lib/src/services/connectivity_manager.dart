@@ -6,13 +6,18 @@ class ConnectivityManager {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isConnected = true;
 
-  ConnectivityManager({required this.onConnectivityChanged});
+  late final Connectivity _connectivity;
+
+  ConnectivityManager({
+    Connectivity? connectivity,
+    required this.onConnectivityChanged,
+  }) : _connectivity = connectivity ?? Connectivity();
 
   bool get isConnected => _isConnected;
 
   void startMonitoring() {
     _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen(_handleConnectivityChange);
+        _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
   }
 
   void stopMonitoring() {
@@ -22,8 +27,7 @@ class ConnectivityManager {
 
   void _handleConnectivityChange(List<ConnectivityResult> result) {
     final wasConnected = _isConnected;
-    _isConnected =
-        !(result.contains(ConnectivityResult.none) || result.isEmpty);
+    _isConnected = result.isNotEmpty && !result.contains(ConnectivityResult.none);
 
     if (wasConnected != _isConnected) {
       onConnectivityChanged(_isConnected);
