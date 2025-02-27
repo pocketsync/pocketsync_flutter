@@ -24,22 +24,21 @@ class PocketSync {
   String? _userId;
   final _syncLock = Lock();
 
-  late PocketSyncNetworkService _networkService;
-  late ChangesProcessor _changesProcessor;
-  late final SyncTaskQueue _syncQueue;
-  late final DatabaseChangeManager _dbChangeManager;
-  late final SyncRetryManager _retryManager;
+  PocketSyncNetworkService? _networkService;
+  ChangesProcessor? _changesProcessor;
+  SyncTaskQueue? _syncQueue;
+  DatabaseChangeManager? _dbChangeManager;
+  SyncRetryManager? _retryManager;
+  ConnectivityManager? _connectivityManager;
 
-  late final ConnectivityManager _connectivityManager;
-
-  SyncStatus _status = SyncStatus.initialized;
+  SyncStatus _status = SyncStatus.idle;
 
   /// Returns the database instance
   /// Throws [StateError] if PocketSync is not initialized
   PocketSyncDatabase get database => _runGuarded(() => _database);
 
   T _runGuarded<T>(T Function() callback) {
-    if (_status != SyncStatus.initialized) {
+    if (_status == SyncStatus.idle) {
       throw StateError(
         'You should call PocketSync.instance.initialize before any other call.',
       );
@@ -58,7 +57,7 @@ class PocketSync {
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
   }) async {
-    if (_status != SyncStatus.initialized) return;
+    if (_status != SyncStatus.idle) return;
 
     _retryManager = SyncRetryManager();
 
@@ -88,9 +87,9 @@ class PocketSync {
     // Set device info in network service
     final deviceState = await DeviceStateManager.getDeviceState(db);
     if (deviceState != null) {
-      _networkService.setDeviceId(deviceState['device_id'] as String);
+      _networkService?.setDeviceId(deviceState['device_id'] as String);
       final lastSyncedAt = deviceState['last_sync_timestamp'] as int?;
-      _networkService.setLastSyncedAt(
+      _networkService?.setLastSyncedAt(
         lastSyncedAt != null
             ? DateTime.fromMillisecondsSinceEpoch(lastSyncedAt)
             : null,
@@ -103,7 +102,7 @@ class PocketSync {
       conflictResolver: options.conflictResolver,
     );
 
-    _networkService.onChangesReceived = _changesProcessor.applyRemoteChanges;
+    _networkService?.onChangesReceived = _changesProcessor?.applyRemoteChanges;
     _status = SyncStatus.initialized;
   }
 
@@ -114,7 +113,7 @@ class PocketSync {
   Future<void> setUserId({required String userId}) async {
     await _runGuarded(() async {
       _userId = userId;
-      _networkService.setUserId(userId);
+      _networkService?.setUserId(userId);
     });
   }
 
@@ -129,13 +128,10 @@ class PocketSync {
       // Initialize connectivity manager before cleanup
       _setupConnectivityMonitoring();
 
-      // Now it's safe to clean up resources
-      await _cleanupResources();
-
       _status = SyncStatus.syncing;
 
-      _dbChangeManager.addGlobalListener(_syncChanges);
-      _networkService.reconnect();
+      _dbChangeManager?.addGlobalListener(_syncChanges);
+      _networkService?.reconnect();
       await _sync();
     });
   }
@@ -147,49 +143,49 @@ class PocketSync {
   void pause() {
     _runGuarded(() {
       _status = SyncStatus.paused;
-      _networkService.disconnect();
-      _dbChangeManager.removeGlobalListener(_syncChanges);
-      _connectivityManager.stopMonitoring();
+      _networkService?.disconnect();
+      _dbChangeManager?.removeGlobalListener(_syncChanges);
+      _connectivityManager?.stopMonitoring();
     });
   }
 
   /// Returns whether sync is currently paused
-  bool get isPaused => _runGuarded(
-      () => !_connectivityManager.isConnected || _status == SyncStatus.paused);
+  bool get isPaused => _runGuarded(() =>
+      _connectivityManager?.isConnected != true ||
+      _status == SyncStatus.paused);
 
   /// Sets up connectivity monitoring
   void _setupConnectivityMonitoring() {
     _connectivityManager = ConnectivityManager(
       onConnectivityChanged: (isConnected) async {
         if (!isConnected) {
-          _networkService.disconnect();
-        } else if (_status == SyncStatus.initialized) {
-          _networkService.reconnect();
+          _networkService?.disconnect();
+        } else if (_status != SyncStatus.idle && _status != SyncStatus.paused) {
+          _networkService?.reconnect();
           await _sync();
         }
       },
     );
-    _connectivityManager.startMonitoring();
+    _connectivityManager?.startMonitoring();
   }
 
   /// Cleans up existing resources without full disposal
   Future<void> _cleanupResources() async {
     // Disconnect network service
-    _networkService.disconnect();
+    _networkService?.disconnect();
 
     // Remove listener from database change manager
-    _dbChangeManager.removeGlobalListener(_syncChanges);
+    _dbChangeManager?.removeGlobalListener(_syncChanges);
 
     // Stop connectivity monitoring
-    _connectivityManager.stopMonitoring();
-
-    _status = SyncStatus.paused;
+    _connectivityManager?.stopMonitoring();
   }
 
   void _syncChanges(String table, bool isRemote) {
     if (isRemote) return;
 
-    if (_status == SyncStatus.syncing && _connectivityManager.isConnected) {
+    if (_status == SyncStatus.syncing &&
+        _connectivityManager?.isConnected == true) {
       scheduleMicrotask(() => _sync());
     }
   }
@@ -197,7 +193,7 @@ class PocketSync {
   /// Internal sync method
   Future<void> _sync() async {
     if (_userId == null ||
-        !_connectivityManager.isConnected ||
+        _connectivityManager?.isConnected != true ||
         _status == SyncStatus.syncing) {
       return;
     }
@@ -205,11 +201,11 @@ class PocketSync {
     await _syncLock.synchronized(() async {
       if (_status == SyncStatus.syncing) return;
 
-      await _retryManager.executeWithRetry(() async {
+      await _retryManager?.executeWithRetry(() async {
         try {
-          final changeSet = await _changesProcessor.getUnSyncedChanges();
-          if (changeSet.isNotEmpty) {
-            await _syncQueue.enqueue(changeSet);
+          final changeSet = await _changesProcessor?.getUnSyncedChanges();
+          if (changeSet != null && changeSet.isNotEmpty) {
+            await _syncQueue?.enqueue(changeSet);
           }
         } catch (e) {
           _logger.error('Error syncing changes', error: e);
@@ -224,7 +220,8 @@ class PocketSync {
     try {
       final processedResponse = await _sendChanges(changeSet);
 
-      if (processedResponse.status == 'success' &&
+      if (processedResponse != null &&
+          processedResponse.status == 'success' &&
           processedResponse.processed) {
         await _markChangesSynced(changeSet.localChangeIds);
         _status = SyncStatus.initialized;
@@ -237,17 +234,18 @@ class PocketSync {
   }
 
   /// Sends changes to the server
-  Future<ChangeProcessingResponse> _sendChanges(ChangeSet changes) async =>
-      await _networkService.sendChanges(changes);
+  Future<ChangeProcessingResponse?> _sendChanges(ChangeSet changes) async =>
+      await _networkService?.sendChanges(changes);
 
   /// Marks changes as synced
   Future<void> _markChangesSynced(List<int> changeIds) async =>
-      await _changesProcessor.markChangesSynced(changeIds);
+      await _changesProcessor?.markChangesSynced(changeIds);
 
   /// Cleans up resources
   Future<void> dispose() async {
-    _status = SyncStatus.initialized;
+    await _cleanupResources();
+    _status = SyncStatus.idle;
     await _database.close();
-    _syncQueue.dispose();
+    _syncQueue?.dispose();
   }
 }

@@ -1,5 +1,9 @@
 /// Represents the current state of the synchronization process
 enum SyncStatus {
+  /// Initial state when PocketSync is not yet initialized.
+  /// This state indicates that the system has not been initialized yet.
+  idle,
+  
   /// Initial state when PocketSync is ready for synchronization.
   /// This state indicates that the system has been properly initialized
   /// and is ready to start syncing changes.

@@ -1,3 +1,7 @@
+## 0.0.14
+- Fix: Pause sync was not working properly
+- Fix: Initialization lifecycle
+
 ## 0.0.13
 - Fix: Starting sync was not working properly
 - Change: Less noise from internal logging
