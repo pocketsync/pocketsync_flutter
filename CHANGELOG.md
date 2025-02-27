@@ -1,3 +1,6 @@
+## 0.0.16
+- Fix: syncPreExistingRecords algo to work with tables not having an id column
+
 ## 0.0.15
 - Add: New `syncPreExistingRecords` option to `PocketSyncOptions` to sync existing records on startup with default value `true`
 - Dev: Add more unit tests

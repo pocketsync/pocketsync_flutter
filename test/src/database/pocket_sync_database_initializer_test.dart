@@ -287,9 +287,10 @@ void main() {
       expect(versions.first['version'], 2);
     });
 
-    test('syncPreExistingRecords creates change records for existing data',
+    test(
+        'syncPreExistingRecords creates change records for existing data with id column',
         () async {
-      // Create a test table
+      // Create a test table with id column
       await db
           .execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
 
@@ -346,6 +347,136 @@ void main() {
       for (final record in updatedRecords) {
         expect(record['ps_global_id'], isNotNull);
       }
+    });
+
+    test(
+        'syncPreExistingRecords handles tables with primary key but no id column',
+        () async {
+      // Create a test table with a primary key that is NOT named 'id'
+      await db.execute(
+          'CREATE TABLE products (product_code TEXT PRIMARY KEY, name TEXT, price REAL)');
+
+      // Insert pre-existing data BEFORE PocketSync is initialized
+      await db.insert('products',
+          {'product_code': 'P001', 'name': 'Product 1', 'price': 10.99});
+      await db.insert('products',
+          {'product_code': 'P002', 'name': 'Product 2', 'price': 20.49});
+
+      // Verify data exists in the table
+      final preExistingData = await db.query('products');
+      expect(preExistingData.length, 2);
+
+      // Now initialize PocketSync system tables
+      await initializer.initializePocketSyncTables(db);
+      await initializer.setupChangeTracking(db);
+      await initializer.initializeTableVersions(db);
+
+      // Sync pre-existing records - this should create change records for our data
+      final syncedCount = await initializer.syncPreExistingRecords(db);
+
+      // Verify correct number of records were synced
+      expect(syncedCount, 2);
+
+      // Verify change records were created
+      final changes = await db.query('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: ['products']);
+      expect(changes.length, 2);
+
+      // Verify change record properties
+      for (final change in changes) {
+        expect(change['table_name'], 'products');
+        expect(change['operation'], 'INSERT');
+        expect(change['synced'], 0);
+
+        // Verify the data field contains the original record data
+        final dataString = change['data'] as String;
+        expect(dataString, contains('"product_code"'));
+        expect(dataString, contains('"name"'));
+        expect(dataString, contains('"price"'));
+      }
+    });
+
+    test(
+        'syncPreExistingRecords handles tables without id or primary key columns',
+        () async {
+      // Create a test table with no primary key or id column
+      await db.execute('CREATE TABLE settings (key TEXT, value TEXT)');
+
+      // Insert pre-existing data BEFORE PocketSync is initialized
+      await db.insert('settings', {'key': 'theme', 'value': 'dark'});
+      await db.insert('settings', {'key': 'language', 'value': 'en'});
+
+      // Verify data exists in the table
+      final preExistingData = await db.query('settings');
+      expect(preExistingData.length, 2);
+
+      // Now initialize PocketSync system tables
+      await initializer.initializePocketSyncTables(db);
+      await initializer.setupChangeTracking(db);
+      await initializer.initializeTableVersions(db);
+
+      // Sync pre-existing records - this should create change records for our data
+      final syncedCount = await initializer.syncPreExistingRecords(db);
+
+      // Verify correct number of records were synced
+      expect(syncedCount, 2);
+
+      // Verify change records were created
+      final changes = await db.query('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: ['settings']);
+      expect(changes.length, 2);
+
+      // Verify change record properties
+      for (final change in changes) {
+        expect(change['table_name'], 'settings');
+        expect(change['operation'], 'INSERT');
+        expect(change['synced'], 0);
+
+        // Verify the data field contains the original record data
+        final dataString = change['data'] as String;
+        expect(dataString, contains('"key"'));
+        expect(dataString, contains('"value"'));
+      }
+    });
+
+    test(
+        'syncPreExistingRecords handles multiple tables with different structures',
+        () async {
+      // Create tables with different structures
+      await db
+          .execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+      await db.execute(
+          'CREATE TABLE products (product_code TEXT PRIMARY KEY, name TEXT)');
+      await db.execute('CREATE TABLE settings (key TEXT, value TEXT)');
+
+      // Insert pre-existing data
+      await db.insert('users', {'name': 'User 1'});
+      await db
+          .insert('products', {'product_code': 'P001', 'name': 'Product 1'});
+      await db.insert('settings', {'key': 'theme', 'value': 'light'});
+
+      // Initialize PocketSync
+      await initializer.initializePocketSyncTables(db);
+      await initializer.setupChangeTracking(db);
+      await initializer.initializeTableVersions(db);
+
+      // Sync pre-existing records
+      final syncedCount = await initializer.syncPreExistingRecords(db);
+
+      // Verify correct number of records were synced
+      expect(syncedCount, 3); // One from each table
+
+      // Verify change records were created for each table
+      final userChanges = await db.query('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: ['users']);
+      final productChanges = await db.query('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: ['products']);
+      final settingChanges = await db.query('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: ['settings']);
+
+      expect(userChanges.length, 1);
+      expect(productChanges.length, 1);
+      expect(settingChanges.length, 1);
     });
 
     test('_generateUpdateCondition creates correct SQL condition', () async {

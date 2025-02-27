@@ -338,8 +338,22 @@ class PocketSyncDatabaseInitializer {
       await db.delete('__pocketsync_changes',
           where: 'table_name = ?', whereArgs: [tableName]);
 
-      // Get all records in the table - order by id to ensure consistent processing order
-      final records = await db.query(tableName, orderBy: 'id ASC');
+      // Check if table has an id column for ordering
+      final hasIdColumn = columns.contains('id');
+      final primaryKeyColumns = await db.rawQuery(
+          "SELECT name FROM pragma_table_info(?) WHERE pk > 0", [tableName]);
+
+      // Determine appropriate ordering
+      String? orderBy;
+      if (hasIdColumn) {
+        orderBy = 'id ASC';
+      } else if (primaryKeyColumns.isNotEmpty) {
+        // Use the first primary key column for ordering
+        orderBy = '${primaryKeyColumns.first['name']} ASC';
+      }
+
+      // Get all records in the table with appropriate ordering
+      final records = await db.query(tableName, orderBy: orderBy);
 
       // Skip if no records
       if (records.isEmpty) continue;
