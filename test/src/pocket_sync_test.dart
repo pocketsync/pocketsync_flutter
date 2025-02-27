@@ -56,16 +56,17 @@ void main() {
       );
 
       expect(pocketSync.database, isNotNull);
-      
+
       // Verify database is properly initialized by executing a query
-      final tables = await pocketSync.database.query('sqlite_master', 
+      final tables = await pocketSync.database.query(
+        'sqlite_master',
         columns: ['name'],
         where: "type = 'table'",
       );
-      
+
       // Extract table names
       final tableNames = tables.map((t) => t['name'] as String).toList();
-      
+
       // Verify our test table and PocketSync system tables exist
       expect(tableNames, contains('test_table'));
       expect(tableNames, contains('__pocketsync_changes'));

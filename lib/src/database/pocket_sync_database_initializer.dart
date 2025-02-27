@@ -56,8 +56,7 @@ class PocketSyncDatabaseInitializer {
   }
 
   /// Gets all user tables (excluding system tables)
-  Future<List<String>> 
-getUserTables(Database db) async {
+  Future<List<String>> getUserTables(Database db) async {
     final tables = await db.query(
       'sqlite_master',
       where: "type = 'table' AND name NOT LIKE '__pocketsync_%' "
@@ -294,17 +293,18 @@ getUserTables(Database db) async {
   }
 
   /// Generates synthetic change records for pre-existing data
-  /// 
+  ///
   /// This method creates INSERT change records for all existing records in user tables
   /// that don't already have corresponding change records. This is useful when adding
   /// PocketSync to an existing app with data that needs to be synced.
-  /// 
+  ///
   /// [db] - The database instance
   /// [options] - Optional parameters to customize the behavior:
   ///   - batchSize: Number of records to process in each batch (default: 100)
   ///   - timestamp: Custom timestamp to use for change records (default: current time)
   ///   - tables: List of specific tables to process (default: all user tables)
-  Future<int> syncPreExistingRecords(Database db, {
+  Future<int> syncPreExistingRecords(
+    Database db, {
     int batchSize = 100,
     int? timestamp,
     List<String>? tables,
@@ -312,43 +312,45 @@ getUserTables(Database db) async {
     // Use current timestamp if not provided
     final changeTimestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
     int totalSyncedRecords = 0;
-    
+
     // Get tables to process
     final tablesToProcess = tables ?? await getUserTables(db);
-    
+
     // Process each table
     for (final tableName in tablesToProcess) {
       // Get all columns for the table
-      final columns = (await db.rawQuery(
-        "SELECT name FROM pragma_table_info(?)", [tableName]
-      )).map((row) => row['name'] as String).toList();
-      
+      final columns = (await db
+              .rawQuery("SELECT name FROM pragma_table_info(?)", [tableName]))
+          .map((row) => row['name'] as String)
+          .toList();
+
       // Skip if table has no columns
       if (columns.isEmpty) continue;
-      
+
       // Ensure ps_global_id exists for all records
       await db.execute('''
         UPDATE $tableName 
         SET ps_global_id = hex(randomblob(16)) 
         WHERE ps_global_id IS NULL
       ''');
-      
+
       // First, clear any existing change records for this table to avoid duplicates
-      await db.delete('__pocketsync_changes', where: 'table_name = ?', whereArgs: [tableName]);
-      
+      await db.delete('__pocketsync_changes',
+          where: 'table_name = ?', whereArgs: [tableName]);
+
       // Get all records in the table - order by id to ensure consistent processing order
       final records = await db.query(tableName, orderBy: 'id ASC');
-      
+
       // Skip if no records
       if (records.isEmpty) continue;
-      
+
       // Get current version for the table
       final versionResult = await db.query(
         '__pocketsync_version',
         where: 'table_name = ?',
         whereArgs: [tableName],
       );
-      
+
       int currentVersion = 0;
       if (versionResult.isNotEmpty) {
         currentVersion = versionResult.first['version'] as int;
@@ -359,26 +361,26 @@ getUserTables(Database db) async {
           {'table_name': tableName, 'version': 0},
         );
       }
-      
+
       // Create batch for inserting change records
       final batch = db.batch();
       int recordsInBatch = 0;
-      
+
       // Process each record
       for (final record in records) {
         // Get or generate global ID
         final recordId = record['ps_global_id'] as String?;
         if (recordId == null) continue;
-        
+
         // Increment version
         currentVersion++;
-        
+
         // Create data JSON with all columns
         final dataMap = <String, dynamic>{};
         for (final col in columns) {
           dataMap[col] = record[col];
         }
-        
+
         // Insert change record
         batch.insert(
           '__pocketsync_changes',
@@ -392,10 +394,10 @@ getUserTables(Database db) async {
             'synced': 0,
           },
         );
-        
+
         recordsInBatch++;
       }
-      
+
       // Update version in the version table
       if (recordsInBatch > 0) {
         batch.update(
@@ -405,34 +407,37 @@ getUserTables(Database db) async {
           whereArgs: [tableName],
         );
       }
-      
+
       // Commit batch
       await batch.commit();
       totalSyncedRecords += recordsInBatch;
     }
-    
+
     return totalSyncedRecords;
   }
-  
+
   /// Converts a map to a JSON string
   String _mapToJsonString(Map<String, dynamic> map) {
     final result = map.entries.map((e) {
       final value = e.value;
-      final valueStr = value == null ? 'null' : 
-                      value is String ? '"${_escapeJsonString(value)}"' :
-                      value.toString();
+      final valueStr = value == null
+          ? 'null'
+          : value is String
+              ? '"${_escapeJsonString(value)}"'
+              : value.toString();
       return '"${e.key}": $valueStr';
     }).join(', ');
-    
+
     return '{$result}';
   }
-  
+
   /// Escapes special characters in JSON strings
   String _escapeJsonString(String s) {
-    return s.replaceAll('\\', '\\\\') // Escape backslashes
-            .replaceAll('"', '\\"')    // Escape double quotes
-            .replaceAll('\n', '\\n')    // Escape newlines
-            .replaceAll('\r', '\\r')    // Escape carriage returns
-            .replaceAll('\t', '\\t');   // Escape tabs
+    return s
+        .replaceAll('\\', '\\\\') // Escape backslashes
+        .replaceAll('"', '\\"') // Escape double quotes
+        .replaceAll('\n', '\\n') // Escape newlines
+        .replaceAll('\r', '\\r') // Escape carriage returns
+        .replaceAll('\t', '\\t'); // Escape tabs
   }
 }

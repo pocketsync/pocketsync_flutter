@@ -27,7 +27,8 @@ class ConnectivityManager {
 
   void _handleConnectivityChange(List<ConnectivityResult> result) {
     final wasConnected = _isConnected;
-    _isConnected = result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    _isConnected =
+        result.isNotEmpty && !result.contains(ConnectivityResult.none);
 
     if (wasConnected != _isConnected) {
       onConnectivityChanged(_isConnected);

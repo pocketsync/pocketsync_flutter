@@ -72,7 +72,8 @@ void main() {
       streamController.close();
     });
 
-    test('_handleConnectivityChange updates connection state correctly', () async {
+    test('_handleConnectivityChange updates connection state correctly',
+        () async {
       // Arrange
       final streamController =
           StreamController<List<ConnectivityResult>>.broadcast();
@@ -113,7 +114,8 @@ void main() {
       streamController.close();
     });
 
-    test('callback is not triggered when connection state does not change', () async {
+    test('callback is not triggered when connection state does not change',
+        () async {
       // Arrange
       int callbackCount = 0;
       final streamController =

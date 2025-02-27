@@ -8,7 +8,7 @@ class MockPocketSyncDatabase extends Mock implements PocketSyncDatabase {}
 void main() {
   late MockPocketSyncDatabase mockDb;
   late QueryWatcher queryWatcher;
-  
+
   const testSql = 'SELECT * FROM test_table';
   final testArgs = ['arg1', 'arg2'];
   final testTables = <String>{'test_table'};
@@ -51,8 +51,7 @@ void main() {
     test('notify adds error to stream when query fails', () async {
       // Arrange
       final testError = Exception('Test error');
-      when(() => mockDb.rawQuery(testSql, testArgs))
-          .thenThrow(testError);
+      when(() => mockDb.rawQuery(testSql, testArgs)).thenThrow(testError);
 
       // Act & Assert
       expectLater(
@@ -67,10 +66,10 @@ void main() {
     test('notify does nothing when watcher is not active', () async {
       // Arrange
       queryWatcher.dispose();
-      
+
       // Act
       await queryWatcher.notify(mockDb);
-      
+
       // Assert
       verifyNever(() => mockDb.rawQuery(any(), any()));
     });
@@ -78,10 +77,10 @@ void main() {
     test('dispose marks watcher as inactive and closes stream', () async {
       // Act
       queryWatcher.dispose();
-      
+
       // Assert
       expect(queryWatcher.stream, emitsDone);
-      
+
       // Verify that notify doesn't do anything after dispose
       await queryWatcher.notify(mockDb);
       verifyNever(() => mockDb.rawQuery(any(), any()));
@@ -97,7 +96,7 @@ void main() {
 
       // Act
       await queryWatcher.notify(mockDb);
-      
+
       // Assert
       verify(() => mockDb.rawQuery(testSql, testArgs)).called(1);
       // No results should be added to the stream since it was disposed
@@ -114,7 +113,7 @@ void main() {
 
       // Act
       await queryWatcher.notify(mockDb);
-      
+
       // Assert
       verify(() => mockDb.rawQuery(testSql, testArgs)).called(1);
       // No error should be added to the stream since it was disposed

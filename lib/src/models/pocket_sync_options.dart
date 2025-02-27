@@ -7,6 +7,8 @@ import 'package:sqflite/sqflite.dart';
 /// [authToken] - The auth token for the PocketSync project. This can be found in the PocketSync dashboard.
 /// [serverUrl] - The URL of the PocketSync server. Default value is 'https://api.pocketsync.dev'.
 /// [conflictResolver] - The conflict resolver to use when local and remote changes conflict. By default, conflicts are ignored and remote changes are applied.
+/// [silent] - Whether to run in silent mode. In silent mode, no logs are printed to the console. Defaults to true in release mode and false in debug mode.
+/// [syncPreExistingRecords] - Whether to automatically sync pre-existing records during initialization. When enabled, PocketSync will automatically create synthetic INSERT change records for all existing records in user tables that don't already have corresponding change records. This is useful when adding PocketSync to an existing app with data that needs to be synced. Defaults to true.
 class PocketSyncOptions {
   /// The project ID for the PocketSync project. This can be found in the PocketSync dashboard.
   /// This is required.

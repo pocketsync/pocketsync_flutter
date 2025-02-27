@@ -1,3 +1,7 @@
+## 0.0.15
+- Add: New `syncPreExistingRecords` option to `PocketSyncOptions` to sync existing records on startup with default value `true`
+- Dev: Add more unit tests
+
 ## 0.0.14
 - Fix: Pause sync was not working properly
 - Fix: Initialization lifecycle

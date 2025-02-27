@@ -1,6 +1,6 @@
 name: pocketsync_flutter
 description: "Pocketsync is a Flutter plugin that provides a simple way to sync your data between devices."
-version: 0.0.14
+version: 0.0.15
 homepage: https://pocketsync.dev
 
 environment:
