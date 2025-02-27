@@ -5,34 +5,20 @@ import 'package:pocketsync_flutter/src/services/connectivity_manager.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../fixtures/pocket_sync_options_fixtures.dart';
 
-class _MockPocketSyncDatabase extends Mock implements PocketSyncDatabase {}
-
 class _MockConnectivityManager extends Mock implements ConnectivityManager {}
-
-class _MockDatabase extends Mock implements Database {}
 
 void main() {
   late PocketSync pocketSync;
-  late _MockPocketSyncDatabase mockPocketsyncDatabase;
   late _MockConnectivityManager mockConnectivityManager;
-  final mockDatabase = _MockDatabase();
 
-  const testDbPath = 'test.db';
+  // Use in-memory database path instead of file path
+  const testDbPath = inMemoryDatabasePath;
 
   setUp(() {
-    registerFallbackValue(DatabaseOptions(onCreate: (db, version) {}));
-
-    mockPocketsyncDatabase = _MockPocketSyncDatabase();
     mockConnectivityManager = _MockConnectivityManager();
-
     pocketSync = PocketSync.instance;
 
-    // Setup default responses
-    when(() => mockPocketsyncDatabase.initialize(
-          dbPath: any(named: 'dbPath'),
-          options: any(named: 'options'),
-        )).thenAnswer((_) async => mockDatabase);
-
+    // Setup connectivity manager mock
     when(() => mockConnectivityManager.isConnected).thenReturn(true);
   });
 
@@ -41,10 +27,27 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
+  tearDown(() async {
+    // Clean up after each test
+    try {
+      await databaseFactory.deleteDatabase(testDbPath);
+    } catch (e) {
+      // Ignore errors during cleanup
+    }
+  });
+
   group('initialization', () {
     test('should initialize successfully with valid options', () async {
       final options = PocketSyncOptionsFixtures.defaultOptions;
-      final databaseOptions = DatabaseOptions(onCreate: (db, version) {});
+      final databaseOptions = DatabaseOptions(
+        version: 1,
+        onCreate: (db, version) async {
+          // Create a test table
+          await db.execute(
+            'CREATE TABLE test_table (id INTEGER PRIMARY KEY, name TEXT)',
+          );
+        },
+      );
 
       await pocketSync.initialize(
         dbPath: testDbPath,
@@ -53,6 +56,19 @@ void main() {
       );
 
       expect(pocketSync.database, isNotNull);
+      
+      // Verify database is properly initialized by executing a query
+      final tables = await pocketSync.database.query('sqlite_master', 
+        columns: ['name'],
+        where: "type = 'table'",
+      );
+      
+      // Extract table names
+      final tableNames = tables.map((t) => t['name'] as String).toList();
+      
+      // Verify our test table and PocketSync system tables exist
+      expect(tableNames, contains('test_table'));
+      expect(tableNames, contains('__pocketsync_changes'));
     });
   });
 }

@@ -62,6 +62,9 @@ class PocketSyncDatabase extends DatabaseExecutor {
 
         await _initializer.initializePocketSyncTables(db);
         await _initializer.verifyChangeTracking(db);
+        
+        // Automatically generate change records for pre-existing data
+        await _initializer.syncPreExistingRecords(db);
       },
       singleInstance: true,
     );

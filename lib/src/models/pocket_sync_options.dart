@@ -27,12 +27,20 @@ class PocketSyncOptions {
   /// Defaults to true in release mode and false in debug mode.
   final bool silent;
 
+  /// Whether to automatically sync pre-existing records during initialization.
+  /// When enabled, PocketSync will automatically create synthetic INSERT change records
+  /// for all existing records in user tables that don't already have corresponding change records.
+  /// This is useful when adding PocketSync to an existing app with data that needs to be synced.
+  /// Defaults to true.
+  final bool syncPreExistingRecords;
+
   PocketSyncOptions({
     required this.projectId,
     required this.authToken,
     this.serverUrl = 'https://api.pocketsync.dev',
     this.conflictResolver = const ConflictResolver(),
     this.silent = !kDebugMode,
+    this.syncPreExistingRecords = true,
   });
 }
 
