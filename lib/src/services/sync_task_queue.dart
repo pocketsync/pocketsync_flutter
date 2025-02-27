@@ -70,8 +70,6 @@ class SyncTaskQueue {
       // Merge changes from all tasks
       final mergedChanges = _mergeChangeSets(tasks.map((t) => t.changeSet));
 
-      _logger.info('Processing merged changes: ${tasks.length} tasks combined');
-
       try {
         await _processWithRetry(() => processChanges(mergedChanges));
         _retryAttempt = 0; // Reset retry counter on success

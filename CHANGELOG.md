@@ -1,3 +1,7 @@
+## 0.0.13
+- Fix: Starting sync was not working properly
+- Change: Less noise from internal logging
+
 ## 0.0.12
 - Add: Unit tests
 - Change: Package is now moved to its own repository and open sourced

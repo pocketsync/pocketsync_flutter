@@ -126,13 +126,15 @@ class PocketSync {
     await _runGuarded(() async {
       if (_userId == null) throw StateError('User ID not set');
 
+      // Initialize connectivity manager before cleanup
+      _setupConnectivityMonitoring();
+
+      // Now it's safe to clean up resources
       await _cleanupResources();
 
       _status = SyncStatus.syncing;
 
       _dbChangeManager.addGlobalListener(_syncChanges);
-
-      _setupConnectivityMonitoring();
       _networkService.reconnect();
       await _sync();
     });
@@ -148,7 +150,6 @@ class PocketSync {
       _networkService.disconnect();
       _dbChangeManager.removeGlobalListener(_syncChanges);
       _connectivityManager.stopMonitoring();
-      _logger.info('Sync manually paused');
     });
   }
 
@@ -173,8 +174,13 @@ class PocketSync {
 
   /// Cleans up existing resources without full disposal
   Future<void> _cleanupResources() async {
+    // Disconnect network service
     _networkService.disconnect();
+
+    // Remove listener from database change manager
     _dbChangeManager.removeGlobalListener(_syncChanges);
+
+    // Stop connectivity monitoring
     _connectivityManager.stopMonitoring();
 
     _status = SyncStatus.paused;
@@ -185,8 +191,6 @@ class PocketSync {
 
     if (_status == SyncStatus.syncing && _connectivityManager.isConnected) {
       scheduleMicrotask(() => _sync());
-    } else {
-      _logger.info('Skipping syncChanges: inappropriate state');
     }
   }
 
@@ -195,7 +199,6 @@ class PocketSync {
     if (_userId == null ||
         !_connectivityManager.isConnected ||
         _status == SyncStatus.syncing) {
-      _logger.info('Sync skipped: user ID not set or inappropriate state');
       return;
     }
 
@@ -219,14 +222,11 @@ class PocketSync {
   /// Processes a batch of changes
   Future<void> _processSync(ChangeSet changeSet) async {
     try {
-      _logger.info('Processing batch: ${changeSet.length} changes');
-
       final processedResponse = await _sendChanges(changeSet);
 
       if (processedResponse.status == 'success' &&
           processedResponse.processed) {
         await _markChangesSynced(changeSet.localChangeIds);
-        _logger.info('Changes successfully synced');
         _status = SyncStatus.initialized;
       }
     } catch (e) {

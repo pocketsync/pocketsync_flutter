@@ -36,20 +36,13 @@ class PocketSyncNetworkService {
         _authToken = authToken,
         _deviceId = deviceId;
 
-  void setUserId(String userId) {
-    _logger.debug('Setting user ID: $userId');
-    _userId = userId;
-  }
+  void setUserId(String userId) => _userId = userId;
 
-  void setDeviceId(String deviceId) {
-    _logger.debug('Setting device ID: $deviceId');
-    _deviceId = deviceId;
-  }
+  void setDeviceId(String deviceId) => _deviceId = deviceId;
 
   void setLastSyncedAt(DateTime? lastSyncedAt) => _lastSyncedAt = lastSyncedAt;
 
   void disconnect() {
-    _logger.info('Disconnecting from WebSocket server');
     _socket?.disconnect();
     _socket = null;
   }
@@ -58,12 +51,9 @@ class PocketSyncNetworkService {
 
   void _connectWebSocket() {
     if (_userId == null || _deviceId == null) {
-      _logger
-          .info('Skipping WebSocket connection: missing user ID or device ID');
       return;
     }
 
-    _logger.info('Connecting to WebSocket server');
     if (_socket != null) {
       _socket!.disconnect();
       _socket = null;
@@ -88,10 +78,6 @@ class PocketSyncNetworkService {
         }
       });
 
-      _socket!.onConnect((_) => _logger.info('Socket.IO connected'));
-
-      _socket!.onDisconnect((_) => _logger.info('Socket.IO disconnected'));
-
       _socket!.on('changes', (data) async {
         if (onChangesReceived != null) {
           final changesData = data as Map<String, dynamic>;
@@ -108,10 +94,6 @@ class PocketSyncNetworkService {
         }
       });
 
-      _socket!.onError((error) {
-        _logger.debug('Socket.IO error: $error');
-      });
-
       _socket!.connect();
     } catch (e) {
       throw NetworkError('WebSocket connection failed', cause: e);
@@ -124,7 +106,6 @@ class PocketSyncNetworkService {
     // Execute network operations in a non-blocking way
     Future.microtask(() async {
       try {
-        _logger.info('Sending changes to server: ${changes.length} changes');
         if (_userId == null) {
           completer.completeError(InitializationError('User ID not set'));
           return;

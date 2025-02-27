@@ -45,8 +45,6 @@ class ChangesProcessor {
           ) AND synced = 0
         ''');
       });
-
-      _logger.warning('Pruned change queue to $_maxQueueSize items');
     }
   }
 
@@ -59,10 +57,6 @@ class ChangesProcessor {
       int lastId = 0;
       int lastVersion = 0;
       final changeIds = <int>[];
-
-      _logger.debug(
-        'Starting to fetch unsynced changes with batch size: $batchSize',
-      );
 
       while (true) {
         List<Map<String, dynamic>> changes;
@@ -80,8 +74,6 @@ class ChangesProcessor {
         }
 
         if (changes.isEmpty) break;
-
-        _logger.debug('Processing batch of ${changes.length} changes');
 
         for (final change in changes) {
           try {
@@ -265,8 +257,6 @@ class ChangesProcessor {
       collectChangedTables(changeSet.updates.changes);
       collectChangedTables(changeSet.deletions.changes);
 
-      _logger.info('Notifying changes for ${changedTables.length} tables');
-
       for (final table in changedTables) {
         _databaseChangeManager.notifyChange(
           table,
@@ -300,13 +290,8 @@ class ChangesProcessor {
         changeLogs.where((log) => !processedIds.contains(log.id));
 
     if (unprocessedChangeLogs.isEmpty) {
-      _logger.info('All changes have already been processed');
       return;
     }
-
-    _logger.info(
-      'Processing ${unprocessedChangeLogs.length} changes',
-    );
 
     _isApplyingRemoteChanges = true;
     try {
@@ -332,9 +317,6 @@ class ChangesProcessor {
           {'last_sync_timestamp': DateTime.now().millisecondsSinceEpoch},
         );
 
-        _logger.info(
-          'Successfully applied ${result.changeSet.length} remote changes',
-        );
         _notifyChanges(result.changeSet);
       }
     } finally {
