@@ -233,7 +233,6 @@ void main() {
 
       test('should apply remote changes when they are newer than local changes',
           () async {
-        final now = 1672527600000; // 2023-01-01 00:00:00
         final localTimestamp = 1672527599000; // Local record is older
         final remoteTimestamp = 1672527601000; // Remote change is newer
 

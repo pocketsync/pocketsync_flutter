@@ -1,3 +1,9 @@
+## 0.1.0
+- Dev: Add more unit tests (to the main pocketsync orchestrator)
+### Breaking Changes
+- Initialize PocketSync with `PocketSync.initialize()` instead of `PocketSync.instance.initialize()`
+
+
 ## 0.0.18
 - Fix: Logs were too noisy
 

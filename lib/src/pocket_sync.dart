@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:meta/meta.dart';
 import 'package:pocketsync_flutter/src/services/connectivity_manager.dart';
 import 'package:pocketsync_flutter/src/database/database_change_manager.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_database.dart';
@@ -15,8 +16,42 @@ import 'services/sync_task_queue.dart';
 import 'models/sync_status.dart';
 
 class PocketSync {
-  static final PocketSync instance = PocketSync._internal();
-  PocketSync._internal();
+  static PocketSync get instance {
+    assert(
+      _instance._initialized,
+      'You must initialize the pocketsync instance before calling PocketSync.instance',
+    );
+    return _instance;
+  }
+
+  bool _initialized = false;
+  PocketSync._();
+  static final PocketSync _instance = PocketSync._();
+
+  // Factory constructor for testing
+  @visibleForTesting
+  factory PocketSync.test({
+    PocketSyncDatabase? database,
+    PocketSyncNetworkService? networkService,
+    ChangesProcessor? changesProcessor,
+    SyncTaskQueue? syncQueue,
+    DatabaseChangeManager? dbChangeManager,
+    SyncRetryManager? retryManager,
+    ConnectivityManager? connectivityManager,
+  }) {
+    final instance = PocketSync._();
+    if (database != null) instance._database = database;
+    if (networkService != null) instance._networkService = networkService;
+    if (changesProcessor != null) instance._changesProcessor = changesProcessor;
+    if (syncQueue != null) instance._syncQueue = syncQueue;
+    if (dbChangeManager != null) instance._dbChangeManager = dbChangeManager;
+    if (retryManager != null) instance._retryManager = retryManager;
+    if (connectivityManager != null) {
+      instance._connectivityManager = connectivityManager;
+    }
+    instance._initialized = true;
+    return instance;
+  }
 
   final _logger = LoggerService.instance;
 
@@ -38,9 +73,9 @@ class PocketSync {
   PocketSyncDatabase get database => _runGuarded(() => _database);
 
   T _runGuarded<T>(T Function() callback) {
-    if (_status == SyncStatus.idle) {
+    if (!_initialized) {
       throw StateError(
-        'You should call PocketSync.instance.initialize before any other call.',
+        'You should call PocketSync.initialize before any other call.',
       );
     }
     return callback();
@@ -52,7 +87,26 @@ class PocketSync {
   /// [databaseOptions] - Database configuration options
   ///
   /// Throws [StateError] if PocketSync is already initialized
-  Future<void> initialize({
+  static Future<PocketSync> initialize({
+    required String dbPath,
+    required PocketSyncOptions options,
+    required DatabaseOptions databaseOptions,
+  }) async {
+    assert(
+      !_instance._initialized,
+      'This instance is already initialized',
+    );
+
+    await _instance._init(
+      dbPath: dbPath,
+      options: options,
+      databaseOptions: databaseOptions,
+    );
+
+    return _instance;
+  }
+
+  Future<void> _init({
     required String dbPath,
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
@@ -104,7 +158,8 @@ class PocketSync {
     );
 
     _networkService?.onChangesReceived = _changesProcessor?.applyRemoteChanges;
-    _status = SyncStatus.initialized;
+
+    _initialized = true;
   }
 
   /// Sets the user ID for synchronization
@@ -149,17 +204,16 @@ class PocketSync {
   }
 
   /// Returns whether sync is currently paused
-  bool get isPaused => _runGuarded(
-        () =>
-            _connectivityManager?.isConnected != true ||
-            _status == SyncStatus.paused,
-      );
+  bool get isPaused => _runGuarded(() =>
+      _connectivityManager?.isConnected != true ||
+      _status == SyncStatus.paused);
 
   /// Sets up connectivity monitoring
   void _setupConnectivityMonitoring() {
     _connectivityManager = ConnectivityManager(
       onConnectivityChanged: (isConnected) async {
         if (!isConnected) {
+          _status = SyncStatus.paused;
           _networkService?.disconnect();
         } else if (_status != SyncStatus.idle && _status != SyncStatus.paused) {
           _networkService?.reconnect();
@@ -184,18 +238,15 @@ class PocketSync {
 
   void _syncChanges(String table, bool isRemote) {
     if (isRemote) return;
-
-    if (_status != SyncStatus.idle &&
-        _status != SyncStatus.paused &&
-        _connectivityManager?.isConnected == true) {
-      scheduleMicrotask(() => _sync());
-    }
+    scheduleMicrotask(() => _sync());
   }
 
   /// Internal sync method
   Future<void> _sync() async {
-    if (_userId == null || _connectivityManager?.isConnected != true) {
-      _logger.info('Skipping sync due to connectivity or user ID');
+    if (_userId == null ||
+        _connectivityManager?.isConnected != true ||
+        _status == SyncStatus.paused) {
+      _logger.info('Skipping sync due to connectivity, status or user ID');
       return;
     }
 
@@ -210,11 +261,11 @@ class PocketSync {
           if (changeSet != null && changeSet.isNotEmpty) {
             await _syncQueue?.enqueue(changeSet);
           } else {
-            _status = SyncStatus.initialized;
+            _status = SyncStatus.idle;
           }
         } catch (e) {
           _logger.error('Error syncing changes', error: e);
-          _status = SyncStatus.initialized;
+          _status = SyncStatus.idle;
           rethrow;
         }
       });
@@ -230,11 +281,11 @@ class PocketSync {
           processedResponse.status == 'success' &&
           processedResponse.processed) {
         await _markChangesSynced(changeSet.localChangeIds);
-        _status = SyncStatus.initialized;
+        _status = SyncStatus.idle;
       }
     } catch (e) {
-      _logger.error('Error processing changes', error: e);
-      _status = SyncStatus.initialized;
+      _logger.error('Error processing changes');
+      _status = SyncStatus.idle;
       rethrow;
     }
   }
@@ -253,5 +304,7 @@ class PocketSync {
     _status = SyncStatus.idle;
     await _database.close();
     _syncQueue?.dispose();
+
+    _initialized = false;
   }
 }
