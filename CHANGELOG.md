@@ -1,3 +1,6 @@
+## 0.0.18
+- Fix: Logs were too noisy
+
 ## 0.0.17
 - Fix: `syncPreExistingRecords` option was not working properly
 - Fix:  Conflict resolution was not properly working properly (we previously could experience data loss in some scenarios where recent changes were squashed by older changes from the server). A proper conflict resolution algorithm was implemented to handle this scenario.

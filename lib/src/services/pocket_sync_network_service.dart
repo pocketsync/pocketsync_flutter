@@ -136,7 +136,7 @@ class PocketSyncNetworkService {
               .completeError(NetworkError('Failed to send changes', cause: e));
         }
       } catch (e) {
-        _logger.error('Error sending changes to server', error: e);
+        _logger.error('Error sending changes to server');
         completer.completeError(e);
       }
     });
