@@ -20,4 +20,17 @@ class ChangeLogFixtures {
     userIdentifier: 'user_identifier',
     changeSet: ChangeSetFixtures.withUpdates,
   );
+
+  static updateWithTimestamp(int remoteTimestamp) {
+    return ChangeLog(
+      id: 2,
+      deviceId: 'device_id',
+      receivedAt: DateTime(2020, 1, 1),
+      processedAt: DateTime(2020, 1, 1),
+      userIdentifier: 'user_identifier',
+      changeSet: ChangeSetFixtures.withUpdates.copyWith(
+        timestamp: remoteTimestamp,
+      ),
+    );
+  }
 }

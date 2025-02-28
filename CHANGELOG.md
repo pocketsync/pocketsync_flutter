@@ -1,5 +1,7 @@
 ## 0.0.17
 - Fix: `syncPreExistingRecords` option was not working properly
+- Fix:  Conflict resolution was not properly working properly (we previously could experience data loss in some scenarios where recent changes were squashed by older changes from the server). A proper conflict resolution algorithm was implemented to handle this scenario.
+- Dev: Add more unit tests (especially to the ChangesProcessor)
 
 ## 0.0.16
 - Fix: syncPreExistingRecords algo to work with tables not having an id column

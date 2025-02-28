@@ -226,4 +226,24 @@ class ChangeSet {
         localChangeIds,
         serverChangeIds,
       );
+
+  ChangeSet copyWith({
+    int? timestamp,
+    int? version,
+    TableChanges? insertions,
+    TableChanges? updates,
+    TableChanges? deletions,
+    List<int>? localChangeIds,
+    List<int>? serverChangeIds,
+  }) {
+    return ChangeSet(
+      timestamp: timestamp ?? this.timestamp,
+      version: version ?? this.version,
+      insertions: insertions ?? this.insertions,
+      updates: updates ?? this.updates,
+      deletions: deletions ?? this.deletions,
+      localChangeIds: localChangeIds ?? this.localChangeIds,
+      serverChangeIds: serverChangeIds ?? this.serverChangeIds,
+    );
+  }
 }

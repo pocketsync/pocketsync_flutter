@@ -2,7 +2,7 @@ import 'package:pocketsync_flutter/src/models/change_set.dart';
 
 class ChangeSetFixtures {
   static final empty = ChangeSet(
-    timestamp: 10,
+    timestamp: 1672527600000,
     version: 1,
     updates: TableChanges({}),
     insertions: TableChanges({}),
@@ -10,7 +10,7 @@ class ChangeSetFixtures {
   );
 
   static final withUpdates = ChangeSet(
-    timestamp: 10,
+    timestamp: 1672527600000,
     version: 1,
     updates: TableChanges(
       {
@@ -21,9 +21,9 @@ class ChangeSetFixtures {
               data: {
                 'ps_global_id': 'id1',
                 'name': 'updated',
-                'timestamp': 10,
+                'timestamp': 1672527600000,
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
@@ -35,7 +35,7 @@ class ChangeSetFixtures {
   );
 
   static final withInsertions = ChangeSet(
-    timestamp: 10,
+    timestamp: 1672527600000,
     version: 1,
     updates: TableChanges({}),
     insertions: TableChanges(
@@ -47,9 +47,9 @@ class ChangeSetFixtures {
               data: {
                 'ps_global_id': 'id1',
                 'name': 'test1',
-                'timestamp': 10,
+                'timestamp': 1672527600000,
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
@@ -60,7 +60,7 @@ class ChangeSetFixtures {
   );
 
   static final withDeletions = ChangeSet(
-    timestamp: 10,
+    timestamp: 1672527600000,
     version: 1,
     updates: TableChanges({}),
     insertions: TableChanges({}),
@@ -74,7 +74,7 @@ class ChangeSetFixtures {
                 'column1': 'value1',
                 'column2': 'value2',
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
@@ -84,7 +84,7 @@ class ChangeSetFixtures {
   );
 
   static final withMultipleChanges = ChangeSet(
-    timestamp: 10,
+    timestamp: 1672527600000,
     version: 1,
     updates: TableChanges(
       {
@@ -96,7 +96,7 @@ class ChangeSetFixtures {
                 'column1': 'value1',
                 'column2': 'value2',
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
@@ -113,7 +113,7 @@ class ChangeSetFixtures {
                 'column1': 'value1',
                 'column2': 'value2',
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
@@ -130,7 +130,7 @@ class ChangeSetFixtures {
                 'column1': 'value1',
                 'column2': 'value2',
               },
-              timestamp: 10,
+              timestamp: 1672527600000,
               version: 1,
             )
           ],
