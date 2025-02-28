@@ -118,7 +118,7 @@ void main() {
           'data': '{"name":"test1"}',
           'record_rowid': 'id1',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         });
 
@@ -140,7 +140,7 @@ void main() {
           'data': '{"name":"test1"}',
           'record_rowid': 'id1',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         });
 
@@ -150,7 +150,7 @@ void main() {
           'data': '{"name":"test2"}',
           'record_rowid': 'id2',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         });
 
@@ -160,7 +160,7 @@ void main() {
           'data': '{"name":"test3"}',
           'record_rowid': 'id3',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         });
 
@@ -233,9 +233,9 @@ void main() {
 
       test('should apply remote changes when they are newer than local changes',
           () async {
-        final now = DateTime(2023, 1, 1).millisecondsSinceEpoch;
-        final localTimestamp = now - 1000; // Local record is older
-        final remoteTimestamp = now + 1000; // Remote change is newer
+        final now = 1672527600000; // 2023-01-01 00:00:00
+        final localTimestamp = 1672527599000; // Local record is older
+        final remoteTimestamp = 1672527601000; // Remote change is newer
 
         // Insert existing record with older timestamp
         await db.insert('test_table', {
@@ -279,7 +279,7 @@ void main() {
           'data': '{"name":"test1"}',
           'record_rowid': 'id1',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         }),
         db.insert('__pocketsync_changes', {
@@ -288,7 +288,7 @@ void main() {
           'data': '{"name":"test2"}',
           'record_rowid': 'id2',
           'version': 1,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'timestamp': 1672531200000, // 2023-01-01 01:00:00
           'synced': 0
         })
       ]);
