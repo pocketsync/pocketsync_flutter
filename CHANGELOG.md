@@ -1,3 +1,6 @@
+## 0.0.17
+- Fix: `syncPreExistingRecords` option was not working properly
+
 ## 0.0.16
 - Fix: syncPreExistingRecords algo to work with tables not having an id column
 

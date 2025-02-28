@@ -17,10 +17,11 @@ class ChangeSetFixtures {
         'test_table': TableRows(
           [
             Row(
-              primaryKey: 'primary_key',
+              primaryKey: 'id1',
               data: {
-                'column1': 'value1',
-                'column2': 'value2',
+                'ps_global_id': 'id1',
+                'name': 'updated',
+                'timestamp': 10,
               },
               timestamp: 10,
               version: 1,
@@ -42,10 +43,11 @@ class ChangeSetFixtures {
         'test_table': TableRows(
           [
             Row(
-              primaryKey: 'primary_key',
+              primaryKey: 'id1',
               data: {
-                'column1': 'value1',
-                'column2': 'value2',
+                'ps_global_id': 'id1',
+                'name': 'test1',
+                'timestamp': 10,
               },
               timestamp: 10,
               version: 1,

@@ -9,6 +9,15 @@ class ChangeLogFixtures {
     receivedAt: DateTime(2020, 1, 1),
     processedAt: DateTime(2020, 1, 1),
     userIdentifier: 'user_identifier',
-    changeSet: ChangeSetFixtures.withMultipleChanges,
+    changeSet: ChangeSetFixtures.withInsertions,
+  );
+
+  static final update = ChangeLog(
+    id: 2,
+    deviceId: 'device_id',
+    receivedAt: DateTime(2020, 1, 1),
+    processedAt: DateTime(2020, 1, 1),
+    userIdentifier: 'user_identifier',
+    changeSet: ChangeSetFixtures.withUpdates,
   );
 }

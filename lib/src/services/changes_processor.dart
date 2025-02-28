@@ -381,12 +381,6 @@ class ChangesProcessor {
           final existing = tableExistingRows[row.primaryKey];
 
           if (existing != null) {
-            final existingTimestamp = existing['timestamp'] as int?;
-            if (existingTimestamp != null &&
-                existingTimestamp >= row.timestamp) {
-              continue; // Skip if existing version is newer
-            }
-
             try {
               final resolvedRow = message.conflictResolver.resolveConflict(
                 tableName,
@@ -399,6 +393,8 @@ class ChangesProcessor {
               validRows.add(row.data);
             }
           } else if (operation == 'INSERT') {
+            validRows.add(row.data);
+          } else if (operation == 'UPDATE') {
             validRows.add(row.data);
           }
         }

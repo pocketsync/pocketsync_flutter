@@ -32,6 +32,7 @@ class PocketSyncDatabase extends DatabaseExecutor {
   Future<Database> initialize({
     required String dbPath,
     required DatabaseOptions options,
+    required bool syncPreExistingRecords,
   }) async {
     _db = await openDatabase(
       dbPath,
@@ -62,9 +63,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
 
         await _initializer.initializePocketSyncTables(db);
         await _initializer.verifyChangeTracking(db);
-
-        // Automatically generate change records for pre-existing data
-        await _initializer.syncPreExistingRecords(db);
+        
+        if (syncPreExistingRecords) {
+          await _initializer.syncPreExistingRecords(db);
+        }
       },
       singleInstance: true,
     );

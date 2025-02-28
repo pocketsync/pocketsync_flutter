@@ -79,6 +79,7 @@ class PocketSync {
     final db = await _database.initialize(
       dbPath: dbPath,
       options: databaseOptions,
+      syncPreExistingRecords: options.syncPreExistingRecords,
     );
 
     // Initialize device state
@@ -128,8 +129,6 @@ class PocketSync {
       // Initialize connectivity manager before cleanup
       _setupConnectivityMonitoring();
 
-      _status = SyncStatus.syncing;
-
       _dbChangeManager?.addGlobalListener(_syncChanges);
       _networkService?.reconnect();
       await _sync();
@@ -150,9 +149,11 @@ class PocketSync {
   }
 
   /// Returns whether sync is currently paused
-  bool get isPaused => _runGuarded(() =>
-      _connectivityManager?.isConnected != true ||
-      _status == SyncStatus.paused);
+  bool get isPaused => _runGuarded(
+        () =>
+            _connectivityManager?.isConnected != true ||
+            _status == SyncStatus.paused,
+      );
 
   /// Sets up connectivity monitoring
   void _setupConnectivityMonitoring() {
@@ -184,7 +185,8 @@ class PocketSync {
   void _syncChanges(String table, bool isRemote) {
     if (isRemote) return;
 
-    if (_status == SyncStatus.syncing &&
+    if (_status != SyncStatus.idle &&
+        _status != SyncStatus.paused &&
         _connectivityManager?.isConnected == true) {
       scheduleMicrotask(() => _sync());
     }
@@ -192,23 +194,27 @@ class PocketSync {
 
   /// Internal sync method
   Future<void> _sync() async {
-    if (_userId == null ||
-        _connectivityManager?.isConnected != true ||
-        _status == SyncStatus.syncing) {
+    if (_userId == null || _connectivityManager?.isConnected != true) {
+      _logger.info('Skipping sync due to connectivity or user ID');
       return;
     }
 
     await _syncLock.synchronized(() async {
       if (_status == SyncStatus.syncing) return;
 
+      _status = SyncStatus.syncing;
+
       await _retryManager?.executeWithRetry(() async {
         try {
           final changeSet = await _changesProcessor?.getUnSyncedChanges();
           if (changeSet != null && changeSet.isNotEmpty) {
             await _syncQueue?.enqueue(changeSet);
+          } else {
+            _status = SyncStatus.initialized;
           }
         } catch (e) {
           _logger.error('Error syncing changes', error: e);
+          _status = SyncStatus.initialized;
           rethrow;
         }
       });
