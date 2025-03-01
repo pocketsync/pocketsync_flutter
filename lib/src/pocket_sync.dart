@@ -181,11 +181,14 @@ class PocketSync {
     await _runGuarded(() async {
       if (_userId == null) throw StateError('User ID not set');
 
+      _status = SyncStatus.idle;
+
       // Initialize connectivity manager before cleanup
       _setupConnectivityMonitoring();
 
       _dbChangeManager?.addGlobalListener(_syncChanges);
       _networkService?.reconnect();
+      
       await _sync();
     });
   }
