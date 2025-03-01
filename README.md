@@ -54,7 +54,7 @@ void main() async {
   final dbPath = join(await getDatabasesPath(), 'my_app.db');
   
   try {
-    await PocketSync.instance.initialize(
+    await PocketSync.initialize(
       dbPath: dbPath,
       options: PocketSyncOptions(
         projectId: 'your-project-id',

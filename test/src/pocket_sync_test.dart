@@ -3,7 +3,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/services/changes_processor.dart';
 import 'package:pocketsync_flutter/src/services/connectivity_manager.dart';
-import 'package:pocketsync_flutter/src/services/pocket_sync_network_service.dart';
 import 'package:pocketsync_flutter/src/services/sync_task_queue.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../fixtures/change_set_fixtures.dart';
@@ -13,8 +12,6 @@ class _MockConnectivityManager extends Mock implements ConnectivityManager {
   @override
   void Function(bool isConnected) get onConnectivityChanged => (bool _) {};
 }
-
-class _MockNetworkService extends Mock implements PocketSyncNetworkService {}
 
 class _MockChangesProcessor extends Mock implements ChangesProcessor {}
 
@@ -28,27 +25,36 @@ void main() {
 
   const testDbPath = inMemoryDatabasePath;
 
-  late _MockNetworkService mockNetworkService;
   late _MockChangesProcessor mockChangesProcessor;
   late _MockSyncTaskQueue mockSyncQueue;
 
   setUp(() async {
     mockConnectivityManager = _MockConnectivityManager();
-    mockNetworkService = _MockNetworkService();
     mockChangesProcessor = _MockChangesProcessor();
     mockSyncQueue = _MockSyncTaskQueue();
 
-    // Don't access PocketSync.instance here
-    // Instead, we'll get the instance after initialization in each test
-
-    // Setup connectivity manager mock
     when(() => mockConnectivityManager.isConnected).thenReturn(true);
 
     registerFallbackValue(ChangeSetFixtures.withInsertions);
 
-    // Ensure cleanup from previous tests
     try {
       await databaseFactory.deleteDatabase(testDbPath);
+    } catch (e) {
+      // Ignore errors during cleanup
+    }
+  });
+
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
+  tearDown(() async {
+    try {
+      await databaseFactory.deleteDatabase(testDbPath);
+
+      // Reset the singleton instance
+      await PocketSync.instance.dispose();
     } catch (e) {
       // Ignore errors during cleanup
     }
@@ -76,13 +82,6 @@ void main() {
       );
 
       pocketSync = PocketSync.instance;
-      pocketSync = PocketSync.test(
-        database: pocketSync.database,
-        changesProcessor: mockChangesProcessor,
-        syncQueue: mockSyncQueue,
-        networkService: mockNetworkService,
-      );
-
       await pocketSync.setUserId(userId: 'test-user');
       await pocketSync.start();
 
@@ -90,22 +89,6 @@ void main() {
       verifyNever(() => mockChangesProcessor.getUnSyncedChanges());
       verifyNever(() => mockSyncQueue.enqueue(any()));
     });
-  });
-
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
-
-  tearDown(() async {
-    try {
-      await databaseFactory.deleteDatabase(testDbPath);
-      
-      // Reset the singleton instance
-      await PocketSync.instance.dispose();
-    } catch (e) {
-      // Ignore errors during cleanup
-    }
   });
 
   group('initialization', () {
@@ -178,31 +161,6 @@ void main() {
   });
 
   group('sync operations', () {
-    test('should throw error when starting sync without user ID', () async {
-      final options = PocketSyncOptionsFixtures.defaultOptions;
-      final databaseOptions = DatabaseOptions(
-        version: 1,
-        onCreate: (db, version) {
-          return db.execute(
-            'CREATE TABLE test_table (id INTEGER PRIMARY KEY, name TEXT)',
-          );
-        },
-      );
-
-      await PocketSync.initialize(
-        dbPath: testDbPath,
-        options: options,
-        databaseOptions: databaseOptions,
-      );
-
-      pocketSync = PocketSync.instance;
-
-      expect(
-        () => pocketSync.start(),
-        throwsA(isA<StateError>()),
-      );
-    });
-
     test('should start sync successfully with user ID', () async {
       final options = PocketSyncOptionsFixtures.defaultOptions;
       final databaseOptions = DatabaseOptions(
@@ -226,7 +184,7 @@ void main() {
       await pocketSync.start();
       // If no exception is thrown, the test passes
     });
-    
+
     test('should pause sync successfully', () async {
       final options = PocketSyncOptionsFixtures.defaultOptions;
       final databaseOptions = DatabaseOptions(

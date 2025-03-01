@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:meta/meta.dart';
 import 'package:pocketsync_flutter/src/services/connectivity_manager.dart';
 import 'package:pocketsync_flutter/src/database/database_change_manager.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_database.dart';
@@ -27,31 +26,6 @@ class PocketSync {
   bool _initialized = false;
   PocketSync._();
   static final PocketSync _instance = PocketSync._();
-
-  // Factory constructor for testing
-  @visibleForTesting
-  factory PocketSync.test({
-    PocketSyncDatabase? database,
-    PocketSyncNetworkService? networkService,
-    ChangesProcessor? changesProcessor,
-    SyncTaskQueue? syncQueue,
-    DatabaseChangeManager? dbChangeManager,
-    SyncRetryManager? retryManager,
-    ConnectivityManager? connectivityManager,
-  }) {
-    final instance = PocketSync._();
-    if (database != null) instance._database = database;
-    if (networkService != null) instance._networkService = networkService;
-    if (changesProcessor != null) instance._changesProcessor = changesProcessor;
-    if (syncQueue != null) instance._syncQueue = syncQueue;
-    if (dbChangeManager != null) instance._dbChangeManager = dbChangeManager;
-    if (retryManager != null) instance._retryManager = retryManager;
-    if (connectivityManager != null) {
-      instance._connectivityManager = connectivityManager;
-    }
-    instance._initialized = true;
-    return instance;
-  }
 
   final _logger = LoggerService.instance;
 
@@ -188,7 +162,7 @@ class PocketSync {
 
       _dbChangeManager?.addGlobalListener(_syncChanges);
       _networkService?.reconnect();
-      
+
       await _sync();
     });
   }
