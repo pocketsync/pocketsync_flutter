@@ -163,7 +163,7 @@ class PocketSync {
       _dbChangeManager?.addGlobalListener(_syncChanges);
       _networkService?.reconnect();
 
-      await _sync();
+      _sync();
     });
   }
 
