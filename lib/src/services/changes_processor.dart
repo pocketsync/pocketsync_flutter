@@ -308,9 +308,10 @@ class ChangesProcessor {
       );
 
       // Apply processed changes to database on main thread
-      await _applyProcessedChanges(result);
+      // Only update the last sync timestamp if changes were successfully applied
+      final success = await _applyProcessedChanges(result);
 
-      if (result.changeSet.isNotEmpty) {
+      if (success && result.changeSet.isNotEmpty) {
         // Update last sync timestamp
         await _db.update(
           '__pocketsync_device_state',
@@ -318,6 +319,8 @@ class ChangesProcessor {
         );
 
         _notifyChanges(result.changeSet);
+      } else if (!success) {
+        _logger.warning('Failed to apply some remote changes - they will be retried in the next sync');
       }
     } finally {
       _isApplyingRemoteChanges = false;
@@ -418,55 +421,67 @@ class ChangesProcessor {
   }
 
   /// Applies the processed changes to the database
-  Future<void> _applyProcessedChanges(_IsolateResult result) async {
-    await _db.transaction((txn) async {
-      await txn.execute('PRAGMA recursive_triggers = OFF;');
+  /// Returns true if changes were successfully applied, false otherwise
+  Future<bool> _applyProcessedChanges(_IsolateResult result) async {
+    bool success = false;
+    
+    try {
+      await _db.transaction((txn) async {
+        await txn.execute('PRAGMA recursive_triggers = OFF;');
 
-      try {
-        // Apply deletions first
-        for (final entry in result.changeSet.deletions.changes.entries) {
-          final tableName = entry.key;
-          final rows = entry.value.rows;
-          if (rows.isEmpty) continue;
+        try {
+          // Apply deletions first
+          for (final entry in result.changeSet.deletions.changes.entries) {
+            final tableName = entry.key;
+            final rows = entry.value.rows;
+            if (rows.isEmpty) continue;
 
-          final primaryKeys = rows.map((r) => r.primaryKey).toList();
-          final placeholders = List.filled(primaryKeys.length, '?').join(',');
+            final primaryKeys = rows.map((r) => r.primaryKey).toList();
+            final placeholders = List.filled(primaryKeys.length, '?').join(',');
 
-          await txn.rawDelete(
-            'DELETE FROM $tableName WHERE ps_global_id IN ($placeholders)',
-            primaryKeys,
-          );
-        }
-
-        // Apply modifications
-        for (final tableName in result.affectedTables) {
-          final rows = result.processedRows[tableName];
-          if (rows == null || rows.isEmpty) continue;
-
-          final batchSize = 100;
-          for (var i = 0; i < rows.length; i += batchSize) {
-            final batch = rows.skip(i).take(batchSize).toList();
-            final columns = batch.first.keys.toList();
-            final placeholders = List.filled(columns.length, '?').join(',');
-            final values = batch.map((_) => '($placeholders)').join(',');
-
-            await txn.rawInsert(
-              'INSERT OR REPLACE INTO $tableName (${columns.join(',')}) VALUES $values',
-              batch.expand((row) => columns.map((c) => row[c])).toList(),
+            await txn.rawDelete(
+              'DELETE FROM $tableName WHERE ps_global_id IN ($placeholders)',
+              primaryKeys,
             );
           }
-        }
 
-        // Mark changes as processed
-        final now = DateTime.now().toIso8601String();
-        await txn.rawInsert(
-          'INSERT OR REPLACE INTO __pocketsync_processed_changes (change_log_id, processed_at) VALUES ${result.changeSet.serverChangeIds.map((_) => '(?, ?)').join(', ')}',
-          result.changeSet.serverChangeIds.expand((id) => [id, now]).toList(),
-        );
-      } finally {
-        await txn.execute('PRAGMA recursive_triggers = ON;');
-      }
-    });
+          // Apply modifications
+          for (final tableName in result.affectedTables) {
+            final rows = result.processedRows[tableName];
+            if (rows == null || rows.isEmpty) continue;
+
+            final batchSize = 100;
+            for (var i = 0; i < rows.length; i += batchSize) {
+              final batch = rows.skip(i).take(batchSize).toList();
+              final columns = batch.first.keys.toList();
+              final placeholders = List.filled(columns.length, '?').join(',');
+              final values = batch.map((_) => '($placeholders)').join(',');
+
+              await txn.rawInsert(
+                'INSERT OR REPLACE INTO $tableName (${columns.join(',')}) VALUES $values',
+                batch.expand((row) => columns.map((c) => row[c])).toList(),
+              );
+            }
+          }
+
+          // Mark changes as processed only if we've successfully reached this point
+          final now = DateTime.now().toIso8601String();
+          await txn.rawInsert(
+            'INSERT OR REPLACE INTO __pocketsync_processed_changes (change_log_id, processed_at) VALUES ${result.changeSet.serverChangeIds.map((_) => '(?, ?)').join(', ')}',
+            result.changeSet.serverChangeIds.expand((id) => [id, now]).toList(),
+          );
+          
+          success = true;
+        } finally {
+          await txn.execute('PRAGMA recursive_triggers = ON;');
+        }
+      });
+    } catch (e) {
+      _logger.error('Failed to apply remote changes', error: e);
+      success = false;
+    }
+    
+    return success;
   }
 
   /// Pre-loads existing rows for all affected records to minimize database queries

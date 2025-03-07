@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pocketsync_flutter/src/database/database_change_manager.dart';
+import 'package:pocketsync_flutter/src/models/change_log.dart';
+import 'package:pocketsync_flutter/src/models/change_set.dart';
 import 'package:pocketsync_flutter/src/services/changes_processor.dart';
 import 'package:pocketsync_flutter/src/services/conflict_resolver.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -285,6 +287,120 @@ void main() {
             .query('test_table', where: 'ps_global_id = ?', whereArgs: ['id1']);
         expect(updatedRecord.first['name'], equals('updated'));
         expect(updatedRecord.first['timestamp'], equals(1672527600000));
+      });
+      
+      test('should not mark changes as processed when database operation fails', () async {
+        // Create a table with a constraint that will cause the insert to fail
+        await db.execute('''CREATE TABLE test_table_with_constraint (
+          ps_global_id TEXT PRIMARY KEY,
+          name TEXT NOT NULL CHECK (name != 'test1'),
+          timestamp INTEGER
+        )''');
+        
+        // Create a special fixture that will trigger the constraint violation
+        final constraintViolationChangeLog = ChangeLog(
+          id: 999,
+          deviceId: 'device_id',
+          receivedAt: DateTime(2020, 1, 1),
+          processedAt: DateTime(2020, 1, 1),
+          userIdentifier: 'user_identifier',
+          changeSet: ChangeSet(
+            timestamp: 1672527600000,
+            version: 1,
+            updates: TableChanges({}),
+            insertions: TableChanges(
+              {
+                'test_table_with_constraint': TableRows(
+                  [
+                    Row(
+                      primaryKey: 'id1',
+                      data: {
+                        'ps_global_id': 'id1',
+                        'name': 'test1', // This will violate the CHECK constraint
+                        'timestamp': 1672527600000,
+                      },
+                      timestamp: 1672527600000,
+                      version: 1,
+                    )
+                  ],
+                )
+              },
+            ),
+            deletions: TableChanges({}),
+          ),
+        );
+        
+        // When
+        await processor.applyRemoteChanges([constraintViolationChangeLog]);
+        
+        // Then
+        final processedChanges = await db.query(
+          '__pocketsync_processed_changes',
+          where: 'change_log_id = ?',
+          whereArgs: [999],
+        );
+        expect(processedChanges, isEmpty, reason: 'Changes should not be marked as processed when database operation fails');
+      });
+      
+      test('should not update last sync timestamp when changes fail to apply', () async {
+        // Given
+        final initialTimestamp = DateTime.now().millisecondsSinceEpoch - 10000;
+        
+        // Set initial timestamp
+        await db.update(
+          '__pocketsync_device_state',
+          {'last_sync_timestamp': initialTimestamp},
+          where: 'device_id = ?',
+          whereArgs: ['test_device'],
+        );
+        
+        // Create a table with a constraint that will cause the insert to fail
+        await db.execute('''CREATE TABLE test_table_with_constraint2 (
+          ps_global_id TEXT PRIMARY KEY,
+          name TEXT NOT NULL CHECK (name != 'test1'),
+          timestamp INTEGER
+        )''');
+        
+        // Create a special fixture that will trigger the constraint violation
+        final constraintViolationChangeLog = ChangeLog(
+          id: 1000,
+          deviceId: 'device_id',
+          receivedAt: DateTime(2020, 1, 1),
+          processedAt: DateTime(2020, 1, 1),
+          userIdentifier: 'user_identifier',
+          changeSet: ChangeSet(
+            timestamp: 1672527600000,
+            version: 1,
+            updates: TableChanges({}),
+            insertions: TableChanges(
+              {
+                'test_table_with_constraint2': TableRows(
+                  [
+                    Row(
+                      primaryKey: 'id1',
+                      data: {
+                        'ps_global_id': 'id1',
+                        'name': 'test1', // This will violate the CHECK constraint
+                        'timestamp': 1672527600000,
+                      },
+                      timestamp: 1672527600000,
+                      version: 1,
+                    )
+                  ],
+                )
+              },
+            ),
+            deletions: TableChanges({}),
+          ),
+        );
+        
+        // When
+        await processor.applyRemoteChanges([constraintViolationChangeLog]);
+        
+        // Then
+        final deviceState = await db.query('__pocketsync_device_state');
+        expect(deviceState.first['last_sync_timestamp'], equals(initialTimestamp),
+            reason: 'Last sync timestamp should not be updated when changes fail to apply');
       });
 
       test('should notify changes for affected tables', () async {

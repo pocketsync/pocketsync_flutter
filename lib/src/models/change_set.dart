@@ -187,9 +187,9 @@ class ChangeSet {
     return ChangeSet(
       timestamp: json['timestamp'],
       version: json['version'],
-      insertions: TableChanges.fromJson(json['insertions']),
-      updates: TableChanges.fromJson(json['updates']),
-      deletions: TableChanges.fromJson(json['deletions']),
+      insertions: TableChanges.fromJson(json['insertions'] ?? {}),
+      updates: TableChanges.fromJson(json['updates'] ?? {}),
+      deletions: TableChanges.fromJson(json['deletions'] ?? {}),
     );
   }
 
