@@ -17,7 +17,6 @@ class _MockChangesProcessor extends Mock implements ChangesProcessor {}
 
 class _MockSyncTaskQueue extends Mock implements SyncTaskQueue {}
 
-
 // Mock DeviceStateManager to control the last sync timestamp
 class _MockDeviceStateManager {
   static Map<String, dynamic>? _deviceState;

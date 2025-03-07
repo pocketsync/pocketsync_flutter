@@ -288,15 +288,16 @@ void main() {
         expect(updatedRecord.first['name'], equals('updated'));
         expect(updatedRecord.first['timestamp'], equals(1672527600000));
       });
-      
-      test('should not mark changes as processed when database operation fails', () async {
+
+      test('should not mark changes as processed when database operation fails',
+          () async {
         // Create a table with a constraint that will cause the insert to fail
         await db.execute('''CREATE TABLE test_table_with_constraint (
           ps_global_id TEXT PRIMARY KEY,
           name TEXT NOT NULL CHECK (name != 'test1'),
           timestamp INTEGER
         )''');
-        
+
         // Create a special fixture that will trigger the constraint violation
         final constraintViolationChangeLog = ChangeLog(
           id: 999,
@@ -316,7 +317,8 @@ void main() {
                       primaryKey: 'id1',
                       data: {
                         'ps_global_id': 'id1',
-                        'name': 'test1', // This will violate the CHECK constraint
+                        'name':
+                            'test1', // This will violate the CHECK constraint
                         'timestamp': 1672527600000,
                       },
                       timestamp: 1672527600000,
@@ -329,23 +331,26 @@ void main() {
             deletions: TableChanges({}),
           ),
         );
-        
+
         // When
         await processor.applyRemoteChanges([constraintViolationChangeLog]);
-        
+
         // Then
         final processedChanges = await db.query(
           '__pocketsync_processed_changes',
           where: 'change_log_id = ?',
           whereArgs: [999],
         );
-        expect(processedChanges, isEmpty, reason: 'Changes should not be marked as processed when database operation fails');
+        expect(processedChanges, isEmpty,
+            reason:
+                'Changes should not be marked as processed when database operation fails');
       });
-      
-      test('should not update last sync timestamp when changes fail to apply', () async {
+
+      test('should not update last sync timestamp when changes fail to apply',
+          () async {
         // Given
         final initialTimestamp = DateTime.now().millisecondsSinceEpoch - 10000;
-        
+
         // Set initial timestamp
         await db.update(
           '__pocketsync_device_state',
@@ -353,14 +358,14 @@ void main() {
           where: 'device_id = ?',
           whereArgs: ['test_device'],
         );
-        
+
         // Create a table with a constraint that will cause the insert to fail
         await db.execute('''CREATE TABLE test_table_with_constraint2 (
           ps_global_id TEXT PRIMARY KEY,
           name TEXT NOT NULL CHECK (name != 'test1'),
           timestamp INTEGER
         )''');
-        
+
         // Create a special fixture that will trigger the constraint violation
         final constraintViolationChangeLog = ChangeLog(
           id: 1000,
@@ -380,7 +385,8 @@ void main() {
                       primaryKey: 'id1',
                       data: {
                         'ps_global_id': 'id1',
-                        'name': 'test1', // This will violate the CHECK constraint
+                        'name':
+                            'test1', // This will violate the CHECK constraint
                         'timestamp': 1672527600000,
                       },
                       timestamp: 1672527600000,
@@ -393,14 +399,16 @@ void main() {
             deletions: TableChanges({}),
           ),
         );
-        
+
         // When
         await processor.applyRemoteChanges([constraintViolationChangeLog]);
-        
+
         // Then
         final deviceState = await db.query('__pocketsync_device_state');
-        expect(deviceState.first['last_sync_timestamp'], equals(initialTimestamp),
-            reason: 'Last sync timestamp should not be updated when changes fail to apply');
+        expect(
+            deviceState.first['last_sync_timestamp'], equals(initialTimestamp),
+            reason:
+                'Last sync timestamp should not be updated when changes fail to apply');
       });
 
       test('should notify changes for affected tables', () async {

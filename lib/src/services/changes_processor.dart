@@ -320,7 +320,8 @@ class ChangesProcessor {
 
         _notifyChanges(result.changeSet);
       } else if (!success) {
-        _logger.warning('Failed to apply some remote changes - they will be retried in the next sync');
+        _logger.warning(
+            'Failed to apply some remote changes - they will be retried in the next sync');
       }
     } finally {
       _isApplyingRemoteChanges = false;
@@ -424,7 +425,7 @@ class ChangesProcessor {
   /// Returns true if changes were successfully applied, false otherwise
   Future<bool> _applyProcessedChanges(_IsolateResult result) async {
     bool success = false;
-    
+
     try {
       await _db.transaction((txn) async {
         await txn.execute('PRAGMA recursive_triggers = OFF;');
@@ -470,7 +471,7 @@ class ChangesProcessor {
             'INSERT OR REPLACE INTO __pocketsync_processed_changes (change_log_id, processed_at) VALUES ${result.changeSet.serverChangeIds.map((_) => '(?, ?)').join(', ')}',
             result.changeSet.serverChangeIds.expand((id) => [id, now]).toList(),
           );
-          
+
           success = true;
         } finally {
           await txn.execute('PRAGMA recursive_triggers = ON;');
@@ -480,7 +481,7 @@ class ChangesProcessor {
       _logger.error('Failed to apply remote changes', error: e);
       success = false;
     }
-    
+
     return success;
   }
 

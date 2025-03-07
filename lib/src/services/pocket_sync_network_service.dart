@@ -56,7 +56,8 @@ class PocketSyncNetworkService {
   /// If lastSyncedAt is provided, it will update the internal timestamp before reconnecting
   void reconnect({DateTime? lastSyncedAt}) {
     if (lastSyncedAt != null) {
-      _logger.info('Updating last sync timestamp before reconnecting: ${lastSyncedAt.toIso8601String()}');
+      _logger.info(
+          'Updating last sync timestamp before reconnecting: ${lastSyncedAt.toIso8601String()}');
       _lastSyncedAt = lastSyncedAt;
     }
     _connectWebSocket();

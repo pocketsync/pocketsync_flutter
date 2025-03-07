@@ -1,3 +1,10 @@
+## 0.1.1
+- Fix: Last sync timestamp was not properly calculated, leading to server sending data in the wrong order.
+- Fix: Invalid columns were present in the sync data
+- Fix: Prevent sync operations on engine start to block the main thread
+
+- Dev: Add more unit test
+
 ## 0.1.0
 - Dev: Add more unit tests (to the main pocketsync orchestrator)
 
