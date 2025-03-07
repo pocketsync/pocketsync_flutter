@@ -56,8 +56,6 @@ class PocketSyncNetworkService {
   /// If lastSyncedAt is provided, it will update the internal timestamp before reconnecting
   void reconnect({DateTime? lastSyncedAt}) {
     if (lastSyncedAt != null) {
-      _logger.info(
-          'Updating last sync timestamp before reconnecting: ${lastSyncedAt.toIso8601String()}');
       _lastSyncedAt = lastSyncedAt;
     }
     _connectWebSocket();
@@ -75,7 +73,7 @@ class PocketSyncNetworkService {
 
     try {
       final lastSyncTimestamp = _lastSyncedAt?.millisecondsSinceEpoch;
-      
+
       _socket = socket_io.io('$_serverUrl/changes', {
         'transports': ['websocket'],
         'autoConnect': true,
@@ -99,27 +97,30 @@ class PocketSyncNetworkService {
       _socket!.on('changes', (data) async {
         if (onChangesReceived != null) {
           final changesData = data as Map<String, dynamic>;
-          
+
           // Update last synced timestamp if server provides it
           if (changesData.containsKey('server_timestamp')) {
             final serverTimestamp = changesData['server_timestamp'] as int?;
             if (serverTimestamp != null) {
-              _lastSyncedAt = DateTime.fromMillisecondsSinceEpoch(serverTimestamp);
-              _logger.info('Updated last_synced_at from WebSocket: ${_lastSyncedAt?.toIso8601String()}');
+              _lastSyncedAt =
+                  DateTime.fromMillisecondsSinceEpoch(serverTimestamp);
+              _logger.info(
+                  'Updated last_synced_at from WebSocket: ${_lastSyncedAt?.toIso8601String()}');
             }
           }
-          
+
           final changelogs = List.from(changesData['changes']).map(
             (raw) => ChangeLog.fromJson(raw),
           );
-          
+
           if (changelogs.isNotEmpty) {
             _logger.info('Received ${changelogs.length} changes from server');
             await onChangesReceived!(changelogs);
-            
+
             // Acknowledge receipt of changes
             if (changesData['requiresAck'] == true) {
-              _logger.info('Acknowledging receipt of ${changelogs.length} changes');
+              _logger.info(
+                  'Acknowledging receipt of ${changelogs.length} changes');
               _socket!.emit('acknowledge-changes', {
                 'changeIds': changelogs.map((log) => log.id).toList(),
                 'device_id': _deviceId,
@@ -131,18 +132,20 @@ class PocketSyncNetworkService {
           }
         }
       });
-      
+
       // Handle server acknowledgment of client changes
       _socket!.on('changes-processed', (data) {
         final ackData = data as Map<String, dynamic>;
         _logger.info('Server acknowledged changes: ${ackData['message']}');
-        
+
         // Update last synced timestamp if server provides it
         if (ackData.containsKey('server_timestamp')) {
           final serverTimestamp = ackData['server_timestamp'] as int?;
           if (serverTimestamp != null) {
-            _lastSyncedAt = DateTime.fromMillisecondsSinceEpoch(serverTimestamp);
-            _logger.info('Updated last_synced_at from acknowledgment: ${_lastSyncedAt?.toIso8601String()}');
+            _lastSyncedAt =
+                DateTime.fromMillisecondsSinceEpoch(serverTimestamp);
+            _logger.info(
+                'Updated last_synced_at from acknowledgment: ${_lastSyncedAt?.toIso8601String()}');
           }
         }
       });
@@ -170,9 +173,6 @@ class PocketSyncNetworkService {
 
         final url = '$_serverUrl/sdk/changes';
         try {
-          final lastSyncTimestamp = _lastSyncedAt?.millisecondsSinceEpoch;
-          _logger.info('Sending changes to server with last_synced_at: $lastSyncTimestamp');
-          
           final response = await _dio.post(
             url,
             options: _getRequestOptions(),
@@ -180,18 +180,10 @@ class PocketSyncNetworkService {
               'changeSets': [changes.toJson()],
             },
           );
-          
+
           final responseData = response.data as Map<String, dynamic>;
-          final processingResponse = ChangeProcessingResponse.fromJson(responseData);
-          
-          // Update the last sync timestamp if provided by the server
-          if (responseData.containsKey('server_timestamp')) {
-            final serverTimestamp = responseData['server_timestamp'] as int?;
-            if (serverTimestamp != null) {
-              _lastSyncedAt = DateTime.fromMillisecondsSinceEpoch(serverTimestamp);
-              _logger.info('Updated last_synced_at from server: ${_lastSyncedAt?.toIso8601String()}');
-            }
-          }
+          final processingResponse =
+              ChangeProcessingResponse.fromJson(responseData);
 
           completer.complete(processingResponse);
         } on DioException catch (e) {

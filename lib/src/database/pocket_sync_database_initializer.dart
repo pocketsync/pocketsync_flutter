@@ -312,11 +312,13 @@ class PocketSyncDatabaseInitializer {
     // Use current timestamp if not provided
     final changeTimestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
     int totalSyncedRecords = 0;
-    
+
     // Check if this is the first sync by looking at device state
     final deviceState = await db.query('__pocketsync_device_state');
-    final isFirstSync = deviceState.isEmpty || deviceState.first['last_sync_timestamp'] == null;
-    
+
+    final isFirstSync =
+        deviceState.isEmpty || deviceState.first['last_sync_timestamp'] == null;
+
     // If this is not the first sync, we don't need to create change records for existing data
     if (!isFirstSync) {
       return 0; // Return 0 indicating no records were synced
@@ -337,16 +339,27 @@ class PocketSyncDatabaseInitializer {
       if (columns.isEmpty) continue;
 
       // Ensure ps_global_id exists for all records
+      // First, drop the specific trigger to avoid creating change records for this update
+      await db.execute('DROP TRIGGER IF EXISTS after_update_$tableName');
+
+      // Update records to add global ID
       await db.execute('''
         UPDATE $tableName 
         SET ps_global_id = hex(randomblob(16)) 
         WHERE ps_global_id IS NULL
       ''');
-      
+
+      // Recreate the trigger
+      await createTableTriggers(db, tableName);
+
       // Check if we already have change records for this table
-      final existingChanges = await db.query('__pocketsync_changes',
-          where: 'table_name = ?', whereArgs: [tableName], limit: 1);
-      
+      final existingChanges = await db.query(
+        '__pocketsync_changes',
+        where: 'table_name = ?',
+        whereArgs: [tableName],
+        limit: 1,
+      );
+
       // Skip if we already have change records for this table
       if (existingChanges.isNotEmpty) continue;
 

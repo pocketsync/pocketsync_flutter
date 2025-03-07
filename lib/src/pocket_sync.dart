@@ -260,16 +260,10 @@ class PocketSync {
 
           // Only enqueue changes if there are actual changes to sync
           // Check both the isNotEmpty property and that there are actual changes in the collections
-          if (changeSet != null &&
-              changeSet.isNotEmpty &&
-              changeSet.localChangeIds.isNotEmpty &&
-              (changeSet.insertions.changes.isNotEmpty ||
-                  changeSet.updates.changes.isNotEmpty ||
-                  changeSet.deletions.changes.isNotEmpty)) {
+          if (changeSet != null && changeSet.isNotEmpty) {
             _logger.info('Syncing ${changeSet.localChangeIds.length} changes');
             await _syncQueue?.enqueue(changeSet);
           } else {
-            _logger.debug('No changes to sync');
             _status = SyncStatus.idle;
           }
         } catch (e) {

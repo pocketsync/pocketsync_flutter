@@ -1,3 +1,6 @@
+## 0.1.2
+- Fix: Pre-existing record option was triggering sync for already synced records
+
 ## 0.1.1
 - Fix: Last sync timestamp was not properly calculated, leading to server sending data in the wrong order.
 - Fix: Invalid columns were present in the sync data

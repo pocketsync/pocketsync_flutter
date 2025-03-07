@@ -30,7 +30,7 @@ PocketSync is a powerful Flutter package that enables seamless data synchronizat
 
 ```yaml
 dependencies:
-  pocketsync_flutter: ^0.1.1
+  pocketsync_flutter: ^0.1.2
 ```
 
 Or install via command line:
