@@ -110,6 +110,36 @@ void main() {
     });
 
     group('getUnSyncedChanges', () {
+      test('should not return changes received from server', () async {
+        // Apply a remote change
+        await processor.applyRemoteChanges([ChangeLogFixtures.insert]);
+
+        // Get unsynced changes
+        final changes = await processor.getUnSyncedChanges();
+
+        // Verify that the remote change is not included in unsynced changes
+        expect(changes.insertions.changes['test_table'], isNull);
+      });
+
+      test('should not return changes marked as synced', () async {
+        // Insert a change and mark it as synced
+        await db.insert('__pocketsync_changes', {
+          'table_name': 'test_table',
+          'operation': 'INSERT',
+          'data': '{"name":"test1"}',
+          'record_rowid': 'id1',
+          'version': 1,
+          'timestamp': 1672531200000,
+          'synced': 1
+        });
+
+        // Get unsynced changes
+        final changes = await processor.getUnSyncedChanges();
+
+        // Verify that the synced change is not included
+        expect(changes.insertions.changes['test_table'], isNull);
+      });
+
       test('should return changes in correct format', () async {
         // Insert test changes
         await db.insert('__pocketsync_changes', {
