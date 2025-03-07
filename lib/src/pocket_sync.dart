@@ -160,8 +160,19 @@ class PocketSync {
       // Initialize connectivity manager before cleanup
       _setupConnectivityMonitoring();
 
+      // Get the latest sync timestamp from the database
+      final deviceState =
+          await DeviceStateManager.getDeviceState(_database.database);
+      final lastSyncTimestamp = deviceState?['last_sync_timestamp'] as int?;
+      final lastSyncedAt = lastSyncTimestamp != null
+          ? DateTime.fromMillisecondsSinceEpoch(lastSyncTimestamp)
+          : null;
+
+      _logger.info(
+          'Starting sync with last sync timestamp: ${lastSyncedAt?.toIso8601String() ?? 'null'}');
+
       _dbChangeManager?.addGlobalListener(_syncChanges);
-      _networkService?.reconnect();
+      _networkService?.reconnect(lastSyncedAt: lastSyncedAt);
 
       _sync();
     });
@@ -169,6 +180,7 @@ class PocketSync {
 
   /// Pauses the synchronization process
   /// This method can be called to pause the synchronization process
+  /// When paused, the device will disconnect from the server and stop listening for changes
   ///
   /// Throws [StateError] if PocketSync is not initialized
   void pause() {
@@ -186,6 +198,8 @@ class PocketSync {
       _status == SyncStatus.paused);
 
   /// Sets up connectivity monitoring
+  /// When connectivity is lost, sync is paused and the device disconnects from the server
+  /// When connectivity is restored, sync is resumed if it wasn't manually paused
   void _setupConnectivityMonitoring() {
     _connectivityManager = ConnectivityManager(
       onConnectivityChanged: (isConnected) async {
@@ -193,7 +207,15 @@ class PocketSync {
           _status = SyncStatus.paused;
           _networkService?.disconnect();
         } else if (_status != SyncStatus.idle && _status != SyncStatus.paused) {
-          _networkService?.reconnect();
+          // Get the latest sync timestamp from the database
+          final deviceState =
+              await DeviceStateManager.getDeviceState(_database.database);
+          final lastSyncTimestamp = deviceState?['last_sync_timestamp'] as int?;
+          final lastSyncedAt = lastSyncTimestamp != null
+              ? DateTime.fromMillisecondsSinceEpoch(lastSyncTimestamp)
+              : null;
+
+          _networkService?.reconnect(lastSyncedAt: lastSyncedAt);
           await _sync();
         }
       },

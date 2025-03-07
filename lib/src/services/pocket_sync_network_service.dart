@@ -42,12 +42,25 @@ class PocketSyncNetworkService {
 
   void setLastSyncedAt(DateTime? lastSyncedAt) => _lastSyncedAt = lastSyncedAt;
 
+  /// Disconnects from the WebSocket server
+  /// This method should be called when sync is paused or the application is closed
   void disconnect() {
-    _socket?.disconnect();
-    _socket = null;
+    if (_socket != null) {
+      _logger.info('Disconnecting from WebSocket server');
+      _socket!.disconnect();
+      _socket = null;
+    }
   }
 
-  void reconnect() => _connectWebSocket();
+  /// Reconnects to the WebSocket server
+  /// If lastSyncedAt is provided, it will update the internal timestamp before reconnecting
+  void reconnect({DateTime? lastSyncedAt}) {
+    if (lastSyncedAt != null) {
+      _logger.info('Updating last sync timestamp before reconnecting: ${lastSyncedAt.toIso8601String()}');
+      _lastSyncedAt = lastSyncedAt;
+    }
+    _connectWebSocket();
+  }
 
   void _connectWebSocket() {
     if (_userId == null || _deviceId == null) {
@@ -77,6 +90,8 @@ class PocketSyncNetworkService {
           'Authorization': 'Bearer $_authToken',
         }
       });
+
+      _socket!.onConnect((_) => _logger.info('Connected to WebSocket'));
 
       _socket!.on('changes', (data) async {
         if (onChangesReceived != null) {
