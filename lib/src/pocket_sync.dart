@@ -257,9 +257,19 @@ class PocketSync {
       await _retryManager?.executeWithRetry(() async {
         try {
           final changeSet = await _changesProcessor?.getUnSyncedChanges();
-          if (changeSet != null && changeSet.isNotEmpty) {
+
+          // Only enqueue changes if there are actual changes to sync
+          // Check both the isNotEmpty property and that there are actual changes in the collections
+          if (changeSet != null &&
+              changeSet.isNotEmpty &&
+              changeSet.localChangeIds.isNotEmpty &&
+              (changeSet.insertions.changes.isNotEmpty ||
+                  changeSet.updates.changes.isNotEmpty ||
+                  changeSet.deletions.changes.isNotEmpty)) {
+            _logger.info('Syncing ${changeSet.localChangeIds.length} changes');
             await _syncQueue?.enqueue(changeSet);
           } else {
+            _logger.debug('No changes to sync');
             _status = SyncStatus.idle;
           }
         } catch (e) {
@@ -280,6 +290,19 @@ class PocketSync {
           processedResponse.status == 'success' &&
           processedResponse.processed) {
         await _markChangesSynced(changeSet.localChangeIds);
+        final now = DateTime.now();
+        await DeviceStateManager.updateLastSyncTimestamp(
+          _database.database,
+          now,
+        );
+
+        _networkService?.setLastSyncedAt(now);
+
+        _logger.info('Changes successfully synced and acknowledged by server');
+        _status = SyncStatus.idle;
+      } else {
+        _logger.warning(
+            'Server did not acknowledge changes: ${processedResponse?.message ?? 'Unknown error'}');
         _status = SyncStatus.idle;
       }
     } catch (e) {
