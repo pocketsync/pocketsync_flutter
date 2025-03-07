@@ -382,10 +382,7 @@ class ChangesProcessor {
 
           if (existing != null) {
             try {
-              // Ensure timestamp is included in the data for conflict resolution
               final remoteData = Map<String, dynamic>.from(row.data);
-              remoteData['timestamp'] = row.timestamp;
-
               final resolvedRow = message.conflictResolver.resolveConflict(
                 tableName,
                 existing,
