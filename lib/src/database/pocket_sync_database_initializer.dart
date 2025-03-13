@@ -1,8 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Internal class responsible for managing PocketSync system tables and triggers
 class PocketSyncDatabaseInitializer {
-  /// Sets up the initial PocketSync system tables
   Future<void> initializePocketSyncTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS __pocketsync_changes (
@@ -55,7 +53,6 @@ class PocketSyncDatabaseInitializer {
     ''');
   }
 
-  /// Gets all user tables (excluding system tables)
   Future<List<String>> getUserTables(Database db) async {
     final tables = await db.query(
       'sqlite_master',
@@ -69,7 +66,6 @@ class PocketSyncDatabaseInitializer {
     return tables.map((t) => t['name'] as String).toList();
   }
 
-  /// Sets up change tracking triggers for all user tables
   Future<void> setupChangeTracking(Database db) async {
     final tables = await getUserTables(db);
 
@@ -98,14 +94,12 @@ class PocketSyncDatabaseInitializer {
     }
   }
 
-  /// Creates triggers for a specific table
   Future<void> createTableTriggers(Database db, String tableName) async {
     final columns = (await db
             .rawQuery("SELECT name FROM pragma_table_info(?)", [tableName]))
         .map((row) => row['name'] as String)
         .toList();
 
-    // UPDATE trigger
     await db.execute('''
       CREATE TRIGGER IF NOT EXISTS after_update_$tableName
       AFTER UPDATE ON $tableName
@@ -138,7 +132,6 @@ class PocketSyncDatabaseInitializer {
       END;
     ''');
 
-    // AFTER INSERT trigger for change tracking
     await db.execute('''
       CREATE TRIGGER IF NOT EXISTS after_insert_$tableName
       AFTER INSERT ON $tableName
@@ -169,7 +162,6 @@ class PocketSyncDatabaseInitializer {
       END;
     ''');
 
-    // DELETE trigger
     await db.execute('''
       CREATE TRIGGER IF NOT EXISTS after_delete_$tableName
       AFTER DELETE ON $tableName
@@ -201,7 +193,6 @@ class PocketSyncDatabaseInitializer {
     ''');
   }
 
-  /// Backs up existing triggers
   Future<void> backupTriggers(Database db) async {
     final triggers = await db.query('sqlite_master',
         where: "type = 'trigger' AND name LIKE 'after_%'");
@@ -225,7 +216,6 @@ class PocketSyncDatabaseInitializer {
     await batch.commit();
   }
 
-  /// Drops existing change tracking triggers
   Future<void> dropChangeTracking(Database db) async {
     final triggers = await db.query('sqlite_master',
         where: "type = 'trigger' AND name LIKE 'after_%'");
@@ -237,7 +227,6 @@ class PocketSyncDatabaseInitializer {
     }
   }
 
-  /// Verifies and repairs change tracking if needed
   Future<void> verifyChangeTracking(Database db) async {
     final tables = await getUserTables(db);
     final existingTriggers = await db.query(
@@ -247,12 +236,10 @@ class PocketSyncDatabaseInitializer {
 
     final expectedTriggerCount = tables.length * 3; // INSERT, UPDATE, DELETE
     if (existingTriggers.length != expectedTriggerCount) {
-      // Re-setup change tracking if triggers are missing
       await setupChangeTracking(db);
     }
   }
 
-  /// Updates version numbers for all tables
   Future<void> updateTableVersions(Database db) async {
     final tables = await getUserTables(db);
     final batch = db.batch();
@@ -267,7 +254,6 @@ class PocketSyncDatabaseInitializer {
     await batch.commit();
   }
 
-  /// Initializes version records for all tables
   Future<void> initializeTableVersions(Database db) async {
     final tables = await getUserTables(db);
     final batch = db.batch();
@@ -292,67 +278,43 @@ class PocketSyncDatabaseInitializer {
     return conditions;
   }
 
-  /// Generates synthetic change records for pre-existing data
-  ///
-  /// This method creates INSERT change records for all existing records in user tables
-  /// that don't already have corresponding change records. This is useful when adding
-  /// PocketSync to an existing app with data that needs to be synced.
-  ///
-  /// [db] - The database instance
-  /// [options] - Optional parameters to customize the behavior:
-  ///   - batchSize: Number of records to process in each batch (default: 100)
-  ///   - timestamp: Custom timestamp to use for change records (default: current time)
-  ///   - tables: List of specific tables to process (default: all user tables)
   Future<int> syncPreExistingRecords(
     Database db, {
     int batchSize = 100,
     int? timestamp,
     List<String>? tables,
   }) async {
-    // Use current timestamp if not provided
     final changeTimestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
     int totalSyncedRecords = 0;
 
-    // Check if this is the first sync by looking at device state
     final deviceState = await db.query('__pocketsync_device_state');
 
     final isFirstSync =
         deviceState.isEmpty || deviceState.first['last_sync_timestamp'] == null;
-
-    // If this is not the first sync, we don't need to create change records for existing data
     if (!isFirstSync) {
-      return 0; // Return 0 indicating no records were synced
+      return 0;
     }
 
-    // Get tables to process
     final tablesToProcess = tables ?? await getUserTables(db);
 
-    // Process each table
     for (final tableName in tablesToProcess) {
-      // Get all columns for the table
       final columns = (await db
               .rawQuery("SELECT name FROM pragma_table_info(?)", [tableName]))
           .map((row) => row['name'] as String)
           .toList();
 
-      // Skip if table has no columns
       if (columns.isEmpty) continue;
 
-      // Ensure ps_global_id exists for all records
-      // First, drop the specific trigger to avoid creating change records for this update
       await db.execute('DROP TRIGGER IF EXISTS after_update_$tableName');
 
-      // Update records to add global ID
       await db.execute('''
         UPDATE $tableName 
         SET ps_global_id = hex(randomblob(16)) 
         WHERE ps_global_id IS NULL
       ''');
 
-      // Recreate the trigger
       await createTableTriggers(db, tableName);
 
-      // Check if we already have change records for this table
       final existingChanges = await db.query(
         '__pocketsync_changes',
         where: 'table_name = ?',
@@ -360,30 +322,23 @@ class PocketSyncDatabaseInitializer {
         limit: 1,
       );
 
-      // Skip if we already have change records for this table
       if (existingChanges.isNotEmpty) continue;
 
-      // Check if table has an id column for ordering
       final hasIdColumn = columns.contains('id');
       final primaryKeyColumns = await db.rawQuery(
           "SELECT name FROM pragma_table_info(?) WHERE pk > 0", [tableName]);
 
-      // Determine appropriate ordering
       String? orderBy;
       if (hasIdColumn) {
         orderBy = 'id ASC';
       } else if (primaryKeyColumns.isNotEmpty) {
-        // Use the first primary key column for ordering
         orderBy = '${primaryKeyColumns.first['name']} ASC';
       }
 
-      // Get all records in the table with appropriate ordering
       final records = await db.query(tableName, orderBy: orderBy);
 
-      // Skip if no records
       if (records.isEmpty) continue;
 
-      // Get current version for the table
       final versionResult = await db.query(
         '__pocketsync_version',
         where: 'table_name = ?',
@@ -394,33 +349,26 @@ class PocketSyncDatabaseInitializer {
       if (versionResult.isNotEmpty) {
         currentVersion = versionResult.first['version'] as int;
       } else {
-        // Insert initial version if not exists
         await db.insert(
           '__pocketsync_version',
           {'table_name': tableName, 'version': 0},
         );
       }
 
-      // Create batch for inserting change records
       final batch = db.batch();
       int recordsInBatch = 0;
 
-      // Process each record
       for (final record in records) {
-        // Get or generate global ID
         final recordId = record['ps_global_id'] as String?;
         if (recordId == null) continue;
 
-        // Increment version
         currentVersion++;
 
-        // Create data JSON with all columns
         final dataMap = <String, dynamic>{};
         for (final col in columns) {
           dataMap[col] = record[col];
         }
 
-        // Insert change record
         batch.insert(
           '__pocketsync_changes',
           {
@@ -437,7 +385,6 @@ class PocketSyncDatabaseInitializer {
         recordsInBatch++;
       }
 
-      // Update version in the version table
       if (recordsInBatch > 0) {
         batch.update(
           '__pocketsync_version',
@@ -447,7 +394,6 @@ class PocketSyncDatabaseInitializer {
         );
       }
 
-      // Commit batch
       await batch.commit();
       totalSyncedRecords += recordsInBatch;
     }
@@ -455,7 +401,6 @@ class PocketSyncDatabaseInitializer {
     return totalSyncedRecords;
   }
 
-  /// Converts a map to a JSON string
   String _mapToJsonString(Map<String, dynamic> map) {
     final result = map.entries.map((e) {
       final value = e.value;
@@ -470,13 +415,12 @@ class PocketSyncDatabaseInitializer {
     return '{$result}';
   }
 
-  /// Escapes special characters in JSON strings
   String _escapeJsonString(String s) {
     return s
-        .replaceAll('\\', '\\\\') // Escape backslashes
-        .replaceAll('"', '\\"') // Escape double quotes
-        .replaceAll('\n', '\\n') // Escape newlines
-        .replaceAll('\r', '\\r') // Escape carriage returns
-        .replaceAll('\t', '\\t'); // Escape tabs
+        .replaceAll('\\', '\\\\') 
+        .replaceAll('"', '\\"') 
+        .replaceAll('\n', '\\n')
+        .replaceAll('\r', '\\r')
+        .replaceAll('\t', '\\t');
   }
 }

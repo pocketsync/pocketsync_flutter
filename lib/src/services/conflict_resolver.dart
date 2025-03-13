@@ -34,18 +34,8 @@ class ConflictResolver {
         );
 
   /// Resolves conflicts synchronously - for use in isolates
-  /// Note: This does not support custom resolvers that require async operations
   Map<String, dynamic> resolveConflict(String tableName,
       Map<String, dynamic> localRow, Map<String, dynamic> remoteRow) {
-    // Implement last-write-wins strategy by comparing timestamps
-    final localTimestamp = localRow['timestamp'] as int?;
-    final remoteTimestamp = remoteRow['timestamp'] as int?;
-
-    if (localTimestamp != null && remoteTimestamp != null) {
-      return remoteTimestamp > localTimestamp ? remoteRow : localRow;
-    }
-
-    // If timestamps are not available, fall back to strategy-based resolution
     switch (strategy) {
       case ConflictResolutionStrategy.ignore:
       case ConflictResolutionStrategy.serverWins:
@@ -54,7 +44,8 @@ class ConflictResolver {
         return localRow;
       case ConflictResolutionStrategy.custom:
         throw UnsupportedError(
-            'Custom conflict resolution is not supported in isolates');
+          'Custom conflict resolution is not supported in isolates',
+        );
     }
   }
 }

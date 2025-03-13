@@ -28,7 +28,6 @@ class PocketSyncBatch implements Batch {
     String? nullColumnHack,
     ConflictAlgorithm? conflictAlgorithm,
   }) {
-    // Generate ps_global_id synchronously for batch operations
     if (!values.containsKey('ps_global_id')) {
       values = Map.of(values);
       values['ps_global_id'] =
@@ -47,7 +46,6 @@ class PocketSyncBatch implements Batch {
   @override
   void rawInsert(String sql, [List<Object?>? arguments]) {
     if (!sql.toLowerCase().contains('ps_global_id')) {
-      // Generate ps_global_id synchronously for batch operations
       final psGlobalId =
           'ps_${DateTime.now().microsecondsSinceEpoch}_${sql.hashCode}';
       sql = sql.replaceFirst(')', ', ps_global_id)');
@@ -56,12 +54,10 @@ class PocketSyncBatch implements Batch {
     }
     _batch.rawInsert(sql, arguments);
 
-    // Extract affected tables from the SQL statement
     final tables = extractAffectedTables(sql);
     affectedTables.addAll(tables);
   }
 
-  // Forward other Batch methods to _batch
   @override
   void delete(String table, {String? where, List<Object?>? whereArgs}) {
     _batch.delete(table, where: where, whereArgs: whereArgs);

@@ -21,7 +21,6 @@ class PocketSyncNetworkService {
   String? _deviceId;
   DateTime? _lastSyncedAt;
 
-  // Callback for handling incoming changes
   Future<void> Function(Iterable<ChangeLog>)? onChangesReceived;
 
   PocketSyncNetworkService({
@@ -42,8 +41,6 @@ class PocketSyncNetworkService {
 
   void setLastSyncedAt(DateTime? lastSyncedAt) => _lastSyncedAt = lastSyncedAt;
 
-  /// Disconnects from the WebSocket server
-  /// This method should be called when sync is paused or the application is closed
   void disconnect() {
     if (_socket != null) {
       _logger.info('Disconnecting from WebSocket server');
@@ -52,8 +49,6 @@ class PocketSyncNetworkService {
     }
   }
 
-  /// Reconnects to the WebSocket server
-  /// If lastSyncedAt is provided, it will update the internal timestamp before reconnecting
   void reconnect({DateTime? lastSyncedAt}) {
     if (lastSyncedAt != null) {
       _lastSyncedAt = lastSyncedAt;
@@ -98,7 +93,6 @@ class PocketSyncNetworkService {
         if (onChangesReceived != null) {
           final changesData = data as Map<String, dynamic>;
 
-          // Update last synced timestamp if server provides it
           if (changesData.containsKey('server_timestamp')) {
             final serverTimestamp = changesData['server_timestamp'] as int?;
             if (serverTimestamp != null) {
@@ -117,7 +111,6 @@ class PocketSyncNetworkService {
             _logger.info('Received ${changelogs.length} changes from server');
             await onChangesReceived!(changelogs);
 
-            // Acknowledge receipt of changes
             if (changesData['requiresAck'] == true) {
               _logger.info(
                   'Acknowledging receipt of ${changelogs.length} changes');
@@ -133,12 +126,9 @@ class PocketSyncNetworkService {
         }
       });
 
-      // Handle server acknowledgment of client changes
       _socket!.on('changes-processed', (data) {
         final ackData = data as Map<String, dynamic>;
         _logger.info('Server acknowledged changes: ${ackData['message']}');
-
-        // Update last synced timestamp if server provides it
         if (ackData.containsKey('server_timestamp')) {
           final serverTimestamp = ackData['server_timestamp'] as int?;
           if (serverTimestamp != null) {
@@ -159,7 +149,6 @@ class PocketSyncNetworkService {
   Future<ChangeProcessingResponse> sendChanges(ChangeSet changes) {
     final completer = Completer<ChangeProcessingResponse>();
 
-    // Execute network operations in a non-blocking way
     Future.microtask(() async {
       try {
         if (_userId == null) {

@@ -161,7 +161,6 @@ class ChangesProcessor {
     });
   }
 
-  /// Marks changes as synced
   Future<void> markChangesSynced(List<int> changeIds) async {
     await _db.update(
       '__pocketsync_changes',
@@ -176,9 +175,7 @@ class ChangesProcessor {
     final updates = <String, List<Row>>{};
     final deletions = <String, List<Row>>{};
 
-    // Process each changelog to merge changes
     for (final log in changeLogs) {
-      // Merge insertions
       log.changeSet.insertions.changes.forEach((tableName, tableRows) {
         insertions.putIfAbsent(tableName, () => []).addAll(
               tableRows.rows.map(
@@ -192,7 +189,6 @@ class ChangesProcessor {
             );
       });
 
-      // Merge updates
       log.changeSet.updates.changes.forEach((tableName, tableRows) {
         updates.putIfAbsent(tableName, () => []).addAll(
               tableRows.rows.map(
@@ -244,7 +240,6 @@ class ChangesProcessor {
     );
   }
 
-  /// Notifies database changes to registered listeners
   void _notifyChanges(ChangeSet changeSet) {
     if (changeSet.isNotEmpty) {
       final changedTables = <String>{};
@@ -266,8 +261,6 @@ class ChangesProcessor {
     }
   }
 
-  /// Applies remote changes to local database
-  /// Checks which change logs have already been processed
   Future<List<int>> _getProcessedChangeLogIds(List<int> changeLogIds) async {
     if (changeLogIds.isEmpty) return [];
 
@@ -295,24 +288,19 @@ class ChangesProcessor {
 
     _isApplyingRemoteChanges = true;
     try {
-      // Pre-fetch existing rows on main thread since it requires DB access
       final changeSet = _computeChangeSetFromChangeLogs(changeLogs);
       final existingRows = await _db.transaction((txn) async {
         return await _preloadExistingRows(changeSet, txn);
       });
 
-      // Process changes in background isolate
       final result = await _processChangesInIsolate(
         changeLogs.toList(),
         existingRows,
       );
 
-      // Apply processed changes to database on main thread
-      // Only update the last sync timestamp if changes were successfully applied
       final success = await _applyProcessedChanges(result);
 
       if (success && result.changeSet.isNotEmpty) {
-        // Update last sync timestamp
         await _db.update(
           '__pocketsync_device_state',
           {'last_sync_timestamp': DateTime.now().millisecondsSinceEpoch},
@@ -328,7 +316,6 @@ class ChangesProcessor {
     }
   }
 
-  /// Processes changes in a background isolate
   Future<_IsolateResult> _processChangesInIsolate(
     List<ChangeLog> changeLogs,
     Map<String, Map<String, Map<String, dynamic>>> existingRows,
@@ -353,14 +340,12 @@ class ChangesProcessor {
     }
   }
 
-  /// Static method to run in isolate
   @pragma('vm:entry-point')
   static void _processChangesIsolate(_IsolateMessage message) {
     final changeSet = _computeChangeSetFromChangeLogs(message.changeLogs);
     final processedRows = <String, List<Map<String, dynamic>>>{};
     final affectedTables = <String>{};
 
-    // Process deletions
     for (final entry in changeSet.deletions.changes.entries) {
       final tableName = entry.key;
       final rows = entry.value.rows;
@@ -370,7 +355,6 @@ class ChangesProcessor {
       affectedTables.add(tableName);
     }
 
-    // Process modifications (updates and inserts)
     void processModifications(
         Map<String, TableRows> changes, String operation) {
       for (final entry in changes.entries) {
@@ -394,7 +378,6 @@ class ChangesProcessor {
               );
               validRows.add(resolvedRow);
             } catch (e) {
-              // If custom resolution is not supported, default to server wins
               validRows.add(row.data);
             }
           } else if (operation == 'INSERT') {
@@ -421,8 +404,6 @@ class ChangesProcessor {
     ));
   }
 
-  /// Applies the processed changes to the database
-  /// Returns true if changes were successfully applied, false otherwise
   Future<bool> _applyProcessedChanges(_IsolateResult result) async {
     bool success = false;
 
@@ -431,7 +412,6 @@ class ChangesProcessor {
         await txn.execute('PRAGMA recursive_triggers = OFF;');
 
         try {
-          // Apply deletions first
           for (final entry in result.changeSet.deletions.changes.entries) {
             final tableName = entry.key;
             final rows = entry.value.rows;
@@ -446,7 +426,6 @@ class ChangesProcessor {
             );
           }
 
-          // Apply modifications
           for (final tableName in result.affectedTables) {
             final rows = result.processedRows[tableName];
             if (rows == null || rows.isEmpty) continue;
@@ -465,7 +444,6 @@ class ChangesProcessor {
             }
           }
 
-          // Mark changes as processed only if we've successfully reached this point
           final now = DateTime.now().toIso8601String();
           await txn.rawInsert(
             'INSERT OR REPLACE INTO __pocketsync_processed_changes (change_log_id, processed_at) VALUES ${result.changeSet.serverChangeIds.map((_) => '(?, ?)').join(', ')}',
@@ -485,7 +463,6 @@ class ChangesProcessor {
     return success;
   }
 
-  /// Pre-loads existing rows for all affected records to minimize database queries
   Future<Map<String, Map<String, Map<String, dynamic>>>> _preloadExistingRows(
     ChangeSet changeSet,
     Transaction txn,
@@ -519,8 +496,6 @@ class ChangesProcessor {
     return result;
   }
 }
-
-/// Message for isolate processing
 class _IsolateMessage {
   final List<ChangeLog> changeLogs;
   final Map<String, Map<String, Map<String, dynamic>>> existingRows;
@@ -535,7 +510,6 @@ class _IsolateMessage {
   );
 }
 
-/// Result from isolate processing
 class _IsolateResult {
   final ChangeSet changeSet;
   final Map<String, List<Map<String, dynamic>>> processedRows;

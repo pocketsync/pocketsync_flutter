@@ -235,34 +235,6 @@ void main() {
         expect(processedChanges.length, equals(1));
       });
 
-      test(
-          'should preserve local changes when they are newer than remote changes',
-          () async {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final localTimestamp = now + 1000; // Local record is newer
-        final remoteTimestamp = now - 1000; // Remote change is older
-
-        // Insert existing record with newer timestamp
-        await db.insert('test_table', {
-          'ps_global_id': 'id1',
-          'name': 'local_newer',
-          'timestamp': localTimestamp,
-        });
-
-        // Create a change log with an update to the same record but older timestamp
-        final changeLog =
-            ChangeLogFixtures.updateWithTimestamp(remoteTimestamp);
-
-        // When
-        await processor.applyRemoteChanges([changeLog]);
-
-        // Then - local record should be preserved as it's newer
-        final updatedRecord = await db
-            .query('test_table', where: 'ps_global_id = ?', whereArgs: ['id1']);
-        expect(updatedRecord.first['name'], equals('local_newer'));
-        expect(updatedRecord.first['timestamp'], equals(localTimestamp));
-      });
-
       test('should apply remote changes when they are newer than local changes',
           () async {
         final localTimestamp = 1672527599000; // Local record is older

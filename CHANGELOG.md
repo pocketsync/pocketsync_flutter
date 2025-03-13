@@ -1,3 +1,6 @@
+## 0.2.0
+- Fix: Some sqlite functions were not available on some Android versions, preventing sync to work and database mutations to happen
+
 ## 0.1.2
 - Fix: Pre-existing record option was triggering sync for already synced records
 

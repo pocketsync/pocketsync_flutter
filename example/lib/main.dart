@@ -13,8 +13,6 @@ void main() async {
   const serverUrl = String.fromEnvironment('PS_SERVER_URL',
       defaultValue: 'https://api.pocketsync.dev');
 
-  // Server url for local backend on Android emulator / iOS simulator:
-
   await PocketSync.initialize(
     dbPath: path,
     options: PocketSyncOptions(

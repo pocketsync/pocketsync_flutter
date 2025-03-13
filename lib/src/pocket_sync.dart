@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:pocketsync_flutter/src/services/connectivity_manager.dart';
 import 'package:pocketsync_flutter/src/database/database_change_manager.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_database.dart';
+import 'package:pocketsync_flutter/src/database/sqlite_ffi_helper.dart';
 import 'package:pocketsync_flutter/src/models/change_set.dart';
 import 'package:pocketsync_flutter/src/services/device_state_manager.dart';
 import 'package:pocketsync_flutter/src/services/logger_service.dart';
@@ -90,6 +91,9 @@ class PocketSync {
     _retryManager = SyncRetryManager();
 
     LoggerService.instance.isSilent = options.silent;
+
+    // Initialize SQLite FFI to support JSON functions on all platforms
+    SqliteFfiHelper.initializeSqliteFfi();
 
     _dbChangeManager = DatabaseChangeManager();
     _networkService = PocketSyncNetworkService(
