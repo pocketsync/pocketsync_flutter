@@ -4,32 +4,62 @@ import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_batch.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_transaction.dart';
 import 'package:pocketsync_flutter/src/database/query_watcher.dart';
+import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:pocketsync_flutter/src/types.dart';
 import 'package:pocketsync_flutter/src/utils/sql_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
 class PocketSyncDatabase extends DatabaseExecutor {
   Database? _db;
+  final SchemaManager _schemaManager;
   final DatabaseWatcher _databaseWatcher;
 
-  PocketSyncDatabase() : _databaseWatcher = DatabaseWatcher();
+  PocketSyncDatabase({required SchemaManager schemaManager})
+      : _schemaManager = schemaManager,
+        _databaseWatcher = DatabaseWatcher();
 
   @override
   Database get database => _db!;
 
-  Future<void> initialize(DatabaseOptions options) async {
+  Future<void> initialize(
+      DatabaseOptions options, TableChangeCallback onDatabaseChange) async {
     _db = await databaseFactory.openDatabase(
       options.dbPath,
       options: OpenDatabaseOptions(
         version: options.version,
-        onUpgrade: options.onUpgrade,
-        onDowngrade: options.onDowngrade,
-        onOpen: options.onOpen,
-        onConfigure: options.onConfigure,
-        onCreate: options.onCreate,
+        onConfigure: (db) async {
+          await options.onConfigure?.call(db);
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+        onCreate: (db, version) async {
+          await _schemaManager.initializePocketSyncTables(db);
+
+          await options.onCreate(db, version);
+          await _schemaManager.setupChangeTracking(db);
+        },
+        onDowngrade: (db, oldVersion, newVersion) async {
+          await options.onDowngrade?.call(db, oldVersion, newVersion);
+
+          await _schemaManager.handleSchemaChanges(db);
+          await _schemaManager.setupChangeTracking(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          await options.onUpgrade?.call(db, oldVersion, newVersion);
+
+          await _schemaManager.handleSchemaChanges(db);
+          await _schemaManager.setupChangeTracking(db);
+        },
+        onOpen: (db) async {
+          await options.onOpen?.call(db);
+
+          await _schemaManager.initializePocketSyncTables(db);
+          await _schemaManager.setupChangeTracking(db);
+        },
         singleInstance: true,
       ),
     );
+
+    _databaseWatcher.setGlobalCallback(onDatabaseChange);
   }
 
   @override

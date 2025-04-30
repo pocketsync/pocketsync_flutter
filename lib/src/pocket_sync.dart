@@ -1,4 +1,6 @@
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:pocketsync_flutter/src/engine/pocket_sync_engine.dart';
+import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 
 class PocketSync {
   static PocketSync get instance {
@@ -15,29 +17,39 @@ class PocketSync {
 
   PocketSyncDatabase get database => _instance._database;
 
-  final PocketSyncDatabase _database = PocketSyncDatabase();
+  static final SchemaManager _schemaManager = SchemaManager();
+  final PocketSyncDatabase _database = PocketSyncDatabase(
+    schemaManager: _schemaManager,
+  );
+  late PocketSyncEngine _engine;
 
   static Future<void> initialize({
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
   }) async {
-    await _instance._database.initialize(databaseOptions);
+    await _instance._database.initialize(
+      databaseOptions,
+      _onDatabaseChange,
+    );
+    _instance._engine = PocketSyncEngine(_instance._database);
     _instance._initialized = true;
   }
 
-  void setUserId(String userId) {
-    // TODO: Implement setting user id
+  static void _onDatabaseChange(String tableName, ChangeType changeType) {
+    // TODO: Implement database change
+    print('Database change: $tableName, $changeType');
+    _instance._engine.scheduleSync();
   }
 
-  Future<void> start() async {
-    // TODO: Implement start
-  }
+  void setUserId(String userId) => _instance._engine.setUserId(userId);
 
-  Future<void> pause() async {
-    // TODO: Implement pause
-  }
+  Future<void> start() async => await _instance._engine.bootstrap();
+
+  Future<void> pause() async => await _instance._engine.stop();
 
   Future<void> dispose() async {
-    // TODO: Implement dispose
+    _instance._engine.stop();
+    _instance._database.close();
+    _instance._initialized = false;
   }
 }
