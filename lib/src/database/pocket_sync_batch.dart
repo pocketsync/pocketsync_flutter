@@ -1,4 +1,5 @@
-import 'package:pocketsync_flutter/src/utils/table_utils.dart';
+import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/utils/sql_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
 class PocketSyncBatch implements Batch {
@@ -6,7 +7,8 @@ class PocketSyncBatch implements Batch {
 
   PocketSyncBatch(this._batch);
 
-  final Set<String> affectedTables = {};
+  final Set<DatabaseMutation> _mutations = {};
+  Set<DatabaseMutation> get mutations => _mutations;
 
   @override
   Future<List<Object?>> commit({
@@ -28,11 +30,6 @@ class PocketSyncBatch implements Batch {
     String? nullColumnHack,
     ConflictAlgorithm? conflictAlgorithm,
   }) {
-    if (!values.containsKey('ps_global_id')) {
-      values = Map.of(values);
-      values['ps_global_id'] =
-          'ps_${DateTime.now().microsecondsSinceEpoch}_${values.hashCode}';
-    }
     _batch.insert(
       table,
       values,
@@ -40,28 +37,21 @@ class PocketSyncBatch implements Batch {
       conflictAlgorithm: conflictAlgorithm,
     );
 
-    affectedTables.add(table);
+    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.insert));
   }
 
   @override
   void rawInsert(String sql, [List<Object?>? arguments]) {
-    if (!sql.toLowerCase().contains('ps_global_id')) {
-      final psGlobalId =
-          'ps_${DateTime.now().microsecondsSinceEpoch}_${sql.hashCode}';
-      sql = sql.replaceFirst(')', ', ps_global_id)');
-      sql = sql.replaceFirst('?)', '?, ?)');
-      arguments = (arguments ?? [])..add(psGlobalId);
-    }
     _batch.rawInsert(sql, arguments);
 
     final tables = extractAffectedTables(sql);
-    affectedTables.addAll(tables);
+    _mutations.addAll(tables.map((table) => DatabaseMutation(tableName: table, changeType: ChangeType.insert)));
   }
 
   @override
   void delete(String table, {String? where, List<Object?>? whereArgs}) {
     _batch.delete(table, where: where, whereArgs: whereArgs);
-    affectedTables.add(table);
+    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.delete));
   }
 
   @override
@@ -115,7 +105,7 @@ class PocketSyncBatch implements Batch {
       conflictAlgorithm: conflictAlgorithm,
     );
 
-    affectedTables.add(table);
+    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.update));
   }
 
   @override

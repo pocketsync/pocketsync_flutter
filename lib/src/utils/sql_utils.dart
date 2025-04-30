@@ -1,3 +1,5 @@
+import 'package:pocketsync_flutter/src/types.dart';
+
 Set<String> extractAffectedTables(String sql) {
   final Set<String> tables = {};
   final Set<String> tempTables = {};
@@ -39,4 +41,17 @@ Set<String> extractAffectedTables(String sql) {
   }
 
   return tables;
+}
+
+ChangeType? determineChangeType(String sql) {
+  sql = sql.toLowerCase();
+  if (sql.contains('insert') || sql.contains('replace')) {
+    return ChangeType.insert;
+  } else if (sql.contains('update')) {
+    return ChangeType.update;
+  } else if (sql.contains('delete')) {
+    return ChangeType.delete;
+  }
+
+  return null;
 }

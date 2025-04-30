@@ -14,7 +14,6 @@ void main() async {
       defaultValue: 'https://api.pocketsync.dev');
 
   await PocketSync.initialize(
-    dbPath: path,
     options: PocketSyncOptions(
       projectId: projectId,
       authToken: authToken,
@@ -24,6 +23,7 @@ void main() async {
       //     : 'http://127.0.0.1:3000',
     ),
     databaseOptions: DatabaseOptions(
+      dbPath: path,
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE todos(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, isCompleted INTEGER)',
@@ -33,7 +33,7 @@ void main() async {
   );
 
   // Set user ID - In a real app, this would come from your auth system
-  await PocketSync.instance.setUserId(userId: 'test-user');
+  PocketSync.instance.setUserId('test-user');
 
   // Start syncing
   await PocketSync.instance.start();

@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../controllers/todo_controller.dart';
 import '../models/todo.dart';
 
+final TodoController _todoController = TodoController(
+  PocketSync.instance.database,
+);
+
 class TodoListView extends StatefulWidget {
   const TodoListView({super.key});
 
@@ -11,8 +15,6 @@ class TodoListView extends StatefulWidget {
 }
 
 class _TodoListViewState extends State<TodoListView> {
-  late final TodoController _todoController =
-      TodoController(PocketSync.instance.database);
   final TextEditingController _textController = TextEditingController();
   bool _isSyncPaused = false;
 
@@ -127,15 +129,18 @@ class _TodoListViewState extends State<TodoListView> {
                   itemBuilder: (context, index) {
                     final todo = snapshot.data![index];
                     return ListTile(
-                      leading: Checkbox(
-                        value: todo.isCompleted,
-                        onChanged: (bool? value) {
-                          _handleTodoOperation(() async {
-                            await _todoController.updateTodo(
-                              todo.copyWith(isCompleted: value),
-                            );
-                          });
-                        },
+                      onTap: () {
+                        _handleTodoOperation(() async {
+                          await _todoController.updateTodo(
+                            todo.copyWith(isCompleted: !todo.isCompleted),
+                          );
+                        });
+                      },
+                      leading: IgnorePointer(
+                        child: Checkbox(
+                          value: todo.isCompleted,
+                          onChanged: (bool? value) {},
+                        ),
                       ),
                       title: Text(
                         todo.title,
