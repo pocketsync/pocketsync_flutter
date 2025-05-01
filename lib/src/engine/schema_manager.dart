@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SchemaManager {
@@ -43,7 +43,7 @@ class SchemaManager {
           // 4. Only now create triggers for change tracking
           await _createTableTriggers(txn, tableName);
         } catch (e) {
-          debugPrint('Error setting up change tracking for $tableName: $e');
+          Logger.log('Error setting up change tracking for $tableName: $e');
           rethrow;
         }
       });
@@ -232,7 +232,7 @@ class SchemaManager {
       return await db.delete('__pocketsync_changes',
           where: 'synced = 1 AND timestamp < ?', whereArgs: [cutoffTimestamp]);
     } catch (e) {
-      debugPrint('Error cleaning up old sync records: $e');
+      Logger.log('Error cleaning up old sync records: $e');
       return 0;
     }
   }
@@ -247,7 +247,7 @@ class SchemaManager {
           // This will recreate triggers with current schema
           await _createTableTriggers(txn, tableName);
         } catch (e) {
-          debugPrint('Error updating triggers for $tableName: $e');
+          Logger.log('Error updating triggers for $tableName: $e');
           rethrow;
         }
       });

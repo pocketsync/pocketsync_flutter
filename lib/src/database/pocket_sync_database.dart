@@ -9,6 +9,8 @@ import 'package:pocketsync_flutter/src/types.dart';
 import 'package:pocketsync_flutter/src/utils/sql_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
+/// A database instance that extends [DatabaseExecutor] and provides additional
+
 class PocketSyncDatabase extends DatabaseExecutor {
   Database? _db;
   final SchemaManager _schemaManager;
@@ -21,6 +23,12 @@ class PocketSyncDatabase extends DatabaseExecutor {
   @override
   Database get database => _db!;
 
+  /// Initializes the database.
+  ///
+  /// This method must be called before using any other database methods.
+  ///
+  /// [options] The configuration options for the database.
+  /// [databaseWatcher] The database watcher to be used for change notifications.
   Future<void> initialize(DatabaseOptions options, DatabaseWatcher databaseWatcher) async {
     _db = await databaseFactory.openDatabase(
       options.dbPath,
@@ -60,12 +68,20 @@ class PocketSyncDatabase extends DatabaseExecutor {
     _databaseWatcher = databaseWatcher;
   }
 
+  /// Returns a new batch for database operations.
+  ///
+  /// This method creates a new batch that can be used to perform multiple
+  /// database operations in a single transaction.
   @override
   Batch batch() {
     final batch = database.batch();
     return PocketSyncBatch(batch);
   }
 
+  /// Commits a batch of database operations.
+  ///
+  /// This method commits a batch of database operations and notifies the
+  /// database watcher of any changes.
   Future<List<Object?>> commit(Batch batch) async {
     final result = await batch.commit();
     for (final mutation in (batch as PocketSyncBatch).mutations) {
@@ -74,6 +90,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return result;
   }
 
+  /// Performs a database transaction.
+  ///
+  /// This method performs a database transaction and notifies the database
+  /// watcher of any changes.
   Future<T> transaction<T>(Future<T> Function(Transaction txn) action) async {
     final mutations = <DatabaseMutation>{};
     final result = await _db!.transaction((txn) async {
@@ -91,12 +111,20 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return result;
   }
 
+  /// Performs a database delete operation.
+  ///
+  /// This method performs a database delete operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> delete(String table, {String? where, List<Object?>? whereArgs}) {
     _databaseWatcher.notifyListeners(table, ChangeType.delete);
     return database.delete(table, where: where, whereArgs: whereArgs);
   }
 
+  /// Performs a database execute operation.
+  ///
+  /// This method performs a database execute operation and notifies the
+  /// database watcher of any changes.
   @override
   Future<void> execute(String sql, [List<Object?>? arguments]) {
     if (determineChangeType(sql) != null) {
@@ -108,6 +136,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return database.execute(sql, arguments);
   }
 
+  /// Performs a database insert operation.
+  ///
+  /// This method performs a database insert operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> insert(
     String table,
@@ -120,6 +152,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
         nullColumnHack: nullColumnHack, conflictAlgorithm: conflictAlgorithm);
   }
 
+  /// Performs a database query operation.
+  ///
+  /// This method performs a database query operation and does not notify the
+  /// database watcher of any changes.
   @override
   Future<List<Map<String, Object?>>> query(
     String table, {
@@ -147,6 +183,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     );
   }
 
+  /// Performs a database query cursor operation.
+  ///
+  /// This method performs a database query cursor operation and does not notify
+  /// the database watcher of any changes.
   @override
   Future<QueryCursor> queryCursor(
     String table, {
@@ -176,6 +216,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     );
   }
 
+  /// Performs a database raw delete operation.
+  ///
+  /// This method performs a database raw delete operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> rawDelete(String sql, [List<Object?>? arguments]) {
     final tables = extractAffectedTables(sql);
@@ -185,6 +229,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return database.rawDelete(sql, arguments);
   }
 
+  /// Performs a database raw insert operation.
+  ///
+  /// This method performs a database raw insert operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> rawInsert(String sql, [List<Object?>? arguments]) {
     final tables = extractAffectedTables(sql);
@@ -194,6 +242,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return database.rawInsert(sql, arguments);
   }
 
+  /// Performs a database raw query operation.
+  ///
+  /// This method performs a database raw query operation and does not notify
+  /// the database watcher of any changes.
   @override
   Future<List<Map<String, Object?>>> rawQuery(String sql,
       [List<Object?>? arguments]) {
@@ -207,12 +259,20 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return database.rawQuery(sql, arguments);
   }
 
+  /// Performs a database raw query cursor operation.
+  ///
+  /// This method performs a database raw query cursor operation and does not
+  /// notify the database watcher of any changes.
   @override
   Future<QueryCursor> rawQueryCursor(String sql, List<Object?>? arguments,
       {int? bufferSize}) {
     return database.rawQueryCursor(sql, arguments, bufferSize: bufferSize);
   }
 
+  /// Performs a database raw update operation.
+  ///
+  /// This method performs a database raw update operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]) {
     final tables = extractAffectedTables(sql);
@@ -222,6 +282,10 @@ class PocketSyncDatabase extends DatabaseExecutor {
     return database.rawUpdate(sql, arguments);
   }
 
+  /// Performs a database update operation.
+  ///
+  /// This method performs a database update operation and notifies the
+  /// database watcher of the change.
   @override
   Future<int> update(
     String table,
@@ -240,6 +304,9 @@ class PocketSyncDatabase extends DatabaseExecutor {
     );
   }
 
+  /// Closes the database.
+  ///
+  /// This method must be called to close the database.
   void close() {
     _databaseWatcher.dispose();
     database.close();
@@ -258,6 +325,12 @@ extension WatchExtension on PocketSyncDatabase {
   Timer? get _debounceTimer => _debounceTimers[this];
   set _debounceTimer(Timer? timer) => _debounceTimers[this] = timer;
 
+  /// Watches for changes in the database.
+  ///
+  /// This method returns a stream of changes to the database.
+  ///
+  /// [sql] The SQL query to watch.
+  /// [arguments] The arguments for the SQL query.
   Stream<List<Map<String, dynamic>>> watch(
     String sql, [
     List<Object?>? arguments,

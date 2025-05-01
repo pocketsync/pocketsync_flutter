@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/engine/sync_change.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Optimizes database changes into efficient transmission chunks.
@@ -25,7 +25,7 @@ class ChangeAggregator {
   /// 
   /// Returns a list of [SyncChange] objects ready for transmission to the server.
   Future<List<SyncChange>> aggregateChanges(String tableName) async {
-    debugPrint('ChangeAggregator: Aggregating changes for table $tableName');
+    Logger.log('ChangeAggregator: Aggregating changes for table $tableName');
 
     // Get all unsynced changes for this table
     final rawChanges = await _database.query(
@@ -39,7 +39,7 @@ class ChangeAggregator {
       return [];
     }
 
-    debugPrint(
+    Logger.log(
         'ChangeAggregator: Found ${rawChanges.length} raw changes for table $tableName');
 
     // Group changes by record ID
@@ -69,7 +69,7 @@ class ChangeAggregator {
       }
     }
 
-    debugPrint(
+    Logger.log(
         'ChangeAggregator: Optimized to ${optimizedChanges.length} changes for table $tableName');
     
     // Convert optimized changes to SyncChange objects
@@ -162,7 +162,7 @@ class ChangeAggregator {
         const JsonDecoder().convert(data) as Map,
       );
     } catch (e) {
-      debugPrint('ChangeAggregator: Error parsing change data: $e');
+      Logger.log('ChangeAggregator: Error parsing change data: $e');
       return {};
     }
   }
@@ -172,7 +172,7 @@ class ChangeAggregator {
     try {
       return const JsonEncoder().convert(data);
     } catch (e) {
-      debugPrint('ChangeAggregator: Error serializing change data: $e');
+      Logger.log('ChangeAggregator: Error serializing change data: $e');
       return '{}';
     }
   }

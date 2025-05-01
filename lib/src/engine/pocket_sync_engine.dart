@@ -1,5 +1,4 @@
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
@@ -10,6 +9,7 @@ import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/engine/sync_worker.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Coordinates the overall synchronization process.
 ///
@@ -50,7 +50,7 @@ class PocketSyncEngine {
   Future<void> bootstrap() async {
     if (_isInitialized) return;
 
-    debugPrint('PocketSyncEngine: Bootstrapping sync engine');
+    Logger.log('PocketSyncEngine: Bootstrapping sync engine');
 
     final deviceFingerprint =
         await _deviceFingerprintProvider.getDeviceFingerprint(
@@ -90,7 +90,7 @@ class PocketSyncEngine {
     _changeListener.startListening();
 
     _isInitialized = true;
-    debugPrint('PocketSyncEngine: Bootstrap complete');
+    Logger.log('PocketSyncEngine: Bootstrap complete');
   }
 
   /// Sets the user ID for synchronization.
@@ -105,7 +105,7 @@ class PocketSyncEngine {
   /// This method is called by the SyncScheduler when it determines that a sync
   /// should be performed.
   Future<void> _performSync() async {
-    debugPrint('PocketSyncEngine: Performing sync operation');
+    Logger.log('PocketSyncEngine: Performing sync operation');
     await _syncWorker.processQueue();
   }
 
@@ -115,11 +115,11 @@ class PocketSyncEngine {
   /// current sync schedule.
   Future<void> scheduleSync() async {
     if (!_isInitialized) {
-      debugPrint('PocketSyncEngine: Cannot sync, not initialized');
+      Logger.log('PocketSyncEngine: Cannot sync, not initialized');
       return;
     }
 
-    debugPrint('PocketSyncEngine: Manual sync requested');
+    Logger.log('PocketSyncEngine: Manual sync requested');
     await _syncScheduler.forceSyncNow();
   }
 
@@ -130,7 +130,7 @@ class PocketSyncEngine {
   Future<void> stop() async {
     if (!_isInitialized) return;
 
-    debugPrint('PocketSyncEngine: Pausing sync operations');
+    Logger.log('PocketSyncEngine: Pausing sync operations');
     _changeListener.stopListening();
     await _syncWorker.stop();
   }
@@ -145,7 +145,7 @@ class PocketSyncEngine {
       return;
     }
 
-    debugPrint('PocketSyncEngine: Resuming sync operations');
+    Logger.log('PocketSyncEngine: Resuming sync operations');
     _changeListener.startListening();
     await _syncWorker.start();
   }
@@ -156,7 +156,7 @@ class PocketSyncEngine {
   Future<void> dispose() async {
     if (!_isInitialized) return;
 
-    debugPrint('PocketSyncEngine: Disposing sync components');
+    Logger.log('PocketSyncEngine: Disposing sync components');
     _changeListener.dispose();
     await _syncWorker.stop();
     _isInitialized = false;

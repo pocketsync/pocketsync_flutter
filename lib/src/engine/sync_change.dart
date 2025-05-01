@@ -1,18 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-
-/// Defines the type of change operation.
-enum ChangeOperation {
-  /// Record was inserted
-  insert,
-
-  /// Record was updated
-  update,
-
-  /// Record was deleted
-  delete,
-}
+import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Represents a single change to be synchronized with the server.
 ///
@@ -29,7 +18,7 @@ class SyncChange {
   final String recordId;
 
   /// The type of operation (insert, update, delete)
-  final ChangeOperation operation;
+  final ChangeType operation;
 
   /// Timestamp when the change occurred (milliseconds since epoch)
   final int timestamp;
@@ -66,9 +55,9 @@ class SyncChange {
   factory SyncChange.fromDatabaseRecord(Map<String, dynamic> record) {
     // Parse the operation string to the enum value
     final operationStr = record['operation'] as String;
-    final operation = ChangeOperation.values.firstWhere(
+    final operation = ChangeType.values.firstWhere(
       (op) => op.name.toUpperCase() == operationStr,
-      orElse: () => ChangeOperation.update,
+      orElse: () => ChangeType.update,
     );
 
     // Parse the JSON data
@@ -77,7 +66,7 @@ class SyncChange {
       final dataStr = record['data'] as String;
       data = json.decode(dataStr) as Map<String, dynamic>;
     } catch (e) {
-      debugPrint('Error parsing change data: $e');
+      Logger.log('Error parsing change data: $e');
       data = {};
     }
 
@@ -112,8 +101,11 @@ class SyncChange {
   ///
   /// This utility method converts a list of raw database records into
   /// a list of structured SyncChange objects.
-  static List<SyncChange> fromDatabaseRecords(List<Map<String, dynamic>> records) {
-    return records.map((record) => SyncChange.fromDatabaseRecord(record)).toList();
+  static List<SyncChange> fromDatabaseRecords(
+      List<Map<String, dynamic>> records) {
+    return records
+        .map((record) => SyncChange.fromDatabaseRecord(record))
+        .toList();
   }
 
   @override
@@ -152,7 +144,8 @@ class SyncChangeBatch {
     return {
       'device_id': deviceId,
       if (userId != null) 'user_id': userId,
-      'changes': changes.map((change) => change.toTransmissionFormat()).toList(),
+      'changes':
+          changes.map((change) => change.toTransmissionFormat()).toList(),
       'batch_timestamp': DateTime.now().millisecondsSinceEpoch,
       'change_count': changes.length,
     };

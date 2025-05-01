@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Processes the sync queue when activated.
@@ -46,7 +46,6 @@ class SyncWorker {
     if (_isRunning) return;
 
     _isRunning = true;
-    debugPrint('SyncWorker: Started');
 
     // Process the queue immediately when starting
     await processQueue();
@@ -68,7 +67,6 @@ class SyncWorker {
     _syncTimer?.cancel();
     _syncTimer = null;
     _isRunning = false;
-    debugPrint('SyncWorker: Stopped');
   }
 
   /// Processes the sync queue.
@@ -80,7 +78,6 @@ class SyncWorker {
 
     try {
       _isSyncing = true;
-      debugPrint('SyncWorker: Processing sync queue');
 
       // Get tables with pending changes
       final tables = _syncQueue.getTablesWithPendingChanges();
@@ -92,12 +89,8 @@ class SyncWorker {
           final changes = await _changeAggregator.aggregateChanges(table);
 
           if (changes.isEmpty) {
-            debugPrint('SyncWorker: No changes to sync for table $table');
             continue;
           }
-
-          debugPrint(
-              'SyncWorker: Syncing ${changes.length} changes for table $table');
 
           // Send changes to the server
           final success = await _apiClient.uploadChanges(changes);
@@ -105,18 +98,15 @@ class SyncWorker {
           if (success) {
             // Mark changes as synced in the database
             await _markChangesAsSynced(
-                table, changes.map((c) => c.id).toList());
+              table,
+              changes.map((c) => c.id).toList(),
+            );
 
             // Mark changes as processed in the queue
             _syncQueue.markTableProcessed(table);
-
-            debugPrint(
-                'SyncWorker: Successfully synced changes for table $table');
-          } else {
-            debugPrint('SyncWorker: Failed to sync changes for table $table');
           }
         } catch (e) {
-          debugPrint('SyncWorker: Error processing table $table: $e');
+          Logger.log('SyncWorker: Error processing table $table: $e');
         }
       }
     } finally {

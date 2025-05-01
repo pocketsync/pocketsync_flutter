@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Manages a queue of pending changes to be synchronized.
 ///
@@ -20,7 +20,7 @@ class SyncQueue {
     _pendingChanges
         .putIfAbsent(tableName, () => <ChangeType>{})
         .add(changeType);
-    debugPrint(
+    Logger.log(
         'SyncQueue: Added ${changeType.name} change for table $tableName');
   }
 
@@ -59,7 +59,7 @@ class SyncQueue {
   /// This removes all pending changes for the specified table.
   void markTableProcessed(String tableName) {
     _pendingChanges.remove(tableName);
-    debugPrint('SyncQueue: Marked table $tableName as processed');
+    Logger.log('SyncQueue: Marked table $tableName as processed');
   }
 
   /// Marks all pending changes as processed.
@@ -67,7 +67,7 @@ class SyncQueue {
   /// This clears the entire queue.
   void markAllProcessed() {
     _pendingChanges.clear();
-    debugPrint('SyncQueue: Marked all changes as processed');
+    Logger.log('SyncQueue: Marked all changes as processed');
   }
 
   /// Gets the number of tables with pending changes.

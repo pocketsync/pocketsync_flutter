@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Listens for database changes and schedules sync operations accordingly.
 ///
@@ -32,7 +32,6 @@ class DatabaseChangeListener {
     
     _databaseWatcher.setGlobalCallback(_onDatabaseChange);
     _isListening = true;
-    debugPrint('DatabaseChangeListener: Started listening for database changes');
   }
 
   /// Stops listening for database changes.
@@ -41,7 +40,6 @@ class DatabaseChangeListener {
     
     _databaseWatcher.setGlobalCallback(null);
     _isListening = false;
-    debugPrint('DatabaseChangeListener: Stopped listening for database changes');
   }
 
   /// Adds a listener for a specific table.
@@ -61,7 +59,7 @@ class DatabaseChangeListener {
   ///
   /// This method forwards the change to the sync scheduler.
   void _onDatabaseChange(String tableName, ChangeType changeType) {
-    debugPrint('DatabaseChangeListener: Change detected in $tableName (${changeType.name})');
+    Logger.log('DatabaseChangeListener: Change detected in $tableName (${changeType.name})');
     _syncScheduler.scheduleSync(tableName, changeType);
   }
 

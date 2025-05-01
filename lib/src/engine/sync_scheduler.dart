@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Manages the timing and scheduling of synchronization operations.
 ///
@@ -52,7 +52,7 @@ class SyncScheduler {
     
     // If a sync is already in progress, we don't need to schedule another one
     if (_isSyncInProgress) {
-      debugPrint('SyncScheduler: Sync already in progress, change queued');
+      Logger.log('SyncScheduler: Sync already in progress, change queued');
       return;
     }
     
@@ -63,20 +63,20 @@ class SyncScheduler {
     
     _syncScheduled = true;
     _debounceTimer = Timer(_debounceInterval, _evaluateSyncConditions);
-    debugPrint('SyncScheduler: Sync scheduled in ${_debounceInterval.inSeconds} seconds');
+    Logger.log('SyncScheduler: Sync scheduled in ${_debounceInterval.inSeconds} seconds');
   }
   
   /// Forces an immediate sync operation regardless of current conditions.
   ///
   /// This is useful for manual sync requests from the user.
   Future<void> forceSyncNow() async {
-    debugPrint('SyncScheduler: Force sync requested');
+    Logger.log('SyncScheduler: Force sync requested');
     _debounceTimer?.cancel();
     _syncScheduled = false;
     
     // Don't start another sync if one is already in progress
     if (_isSyncInProgress) {
-      debugPrint('SyncScheduler: Cannot force sync, sync already in progress');
+      Logger.log('SyncScheduler: Cannot force sync, sync already in progress');
       return;
     }
     
@@ -92,7 +92,7 @@ class SyncScheduler {
     
     // Check if there are any changes to sync
     if (_syncQueue.isEmpty) {
-      debugPrint('SyncScheduler: No changes to sync');
+      Logger.log('SyncScheduler: No changes to sync');
       return;
     }
     
@@ -105,20 +105,20 @@ class SyncScheduler {
   /// the sync process.
   Future<void> _performSync() async {
     if (_isSyncInProgress) {
-      debugPrint('SyncScheduler: Sync already in progress, skipping');
+      Logger.log('SyncScheduler: Sync already in progress, skipping');
       return;
     }
     
     try {
       _isSyncInProgress = true;
-      debugPrint('SyncScheduler: Starting sync operation');
+      Logger.log('SyncScheduler: Starting sync operation');
       
       await _onSyncRequired();
       
       _lastSyncTime = DateTime.now();
-      debugPrint('SyncScheduler: Sync completed at ${_lastSyncTime.toIso8601String()}');
+      Logger.log('SyncScheduler: Sync completed at ${_lastSyncTime.toIso8601String()}');
     } catch (e) {
-      debugPrint('SyncScheduler: Error during sync: $e');
+      Logger.log('SyncScheduler: Error during sync: $e');
     } finally {
       _isSyncInProgress = false;
     }
