@@ -1,33 +1,170 @@
-import 'package:pocketsync_flutter/src/database/pocket_sync_database.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:pocketsync_flutter/src/database/database_watcher.dart';
+import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
+import 'package:pocketsync_flutter/src/engine/database_change_listener.dart';
+import 'package:pocketsync_flutter/src/engine/device_fingerprint_provider.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
+import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
+import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
+import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
+import 'package:pocketsync_flutter/src/engine/sync_worker.dart';
 
+/// Coordinates the overall synchronization process.
+///
+/// The PocketSyncEngine is the main orchestrator of the sync architecture, connecting
+/// all the components together and managing the flow of data between them.
 class PocketSyncEngine {
+  final PocketSyncOptions options;
   final PocketSyncDatabase database;
+  final SchemaManager schemaManager;
   final PocketSyncNetworkClient _apiClient;
+  final DeviceFingerprintProvider _deviceFingerprintProvider;
+  final DatabaseWatcher databaseWatcher;
+
+  late final SyncQueue _syncQueue;
+  late final ChangeAggregator _changeAggregator;
+  late final DatabaseChangeListener _changeListener;
+  late final SyncScheduler _syncScheduler;
+  late final SyncWorker _syncWorker;
+
+  bool _isInitialized = false;
 
   PocketSyncEngine(
     this.database, {
+    required this.options,
+    required this.schemaManager,
+    required this.databaseWatcher,
     PocketSyncNetworkClient? apiClient,
-  }) : _apiClient = apiClient ?? PocketSyncNetworkClient();
+    DeviceFingerprintProvider? deviceFingerprintProvider,
+  })  : _apiClient =
+            apiClient ?? PocketSyncNetworkClient(baseUrl: options.serverUrl),
+        _deviceFingerprintProvider =
+            deviceFingerprintProvider ?? DeviceFingerprintProvider();
 
+  /// Initializes the sync engine and all its components.
+  ///
+  /// This method sets up the entire sync architecture and starts listening for
+  /// database changes.
   Future<void> bootstrap() async {
-    // TODO: start sync worker
+    if (_isInitialized) return;
+
+    debugPrint('PocketSyncEngine: Bootstrapping sync engine');
+
+    final deviceFingerprint =
+        await _deviceFingerprintProvider.getDeviceFingerprint(
+      database.database,
+      DeviceInfoPlugin(),
+    );
+
+    await schemaManager.registerDevice(database.database, deviceFingerprint);
+
+    _apiClient.setupClient(options, deviceFingerprint);
+
+    // Initialize components
+    _syncQueue = SyncQueue();
+
+    _changeAggregator = ChangeAggregator(
+      database: database.database,
+    );
+
+    _syncScheduler = SyncScheduler(
+      syncQueue: _syncQueue,
+      onSyncRequired: _performSync,
+    );
+
+    _changeListener = DatabaseChangeListener(
+      syncScheduler: _syncScheduler,
+      databaseWatcher: databaseWatcher,
+    );
+
+    _syncWorker = SyncWorker(
+      syncQueue: _syncQueue,
+      changeAggregator: _changeAggregator,
+      apiClient: _apiClient,
+      database: database.database,
+    );
+
+    // Start listening for database changes
+    _changeListener.startListening();
+
+    _isInitialized = true;
+    debugPrint('PocketSyncEngine: Bootstrap complete');
   }
 
+  /// Sets the user ID for synchronization.
+  ///
+  /// This method updates the user ID in the API client for authentication.
   void setUserId(String userId) {
-    // TODO: Implement setting user id
+    _apiClient.setUserId(userId);
   }
 
+  /// Performs a sync operation.
+  ///
+  /// This method is called by the SyncScheduler when it determines that a sync
+  /// should be performed.
+  Future<void> _performSync() async {
+    debugPrint('PocketSyncEngine: Performing sync operation');
+    await _syncWorker.processQueue();
+  }
+
+  /// Manually triggers a sync operation.
+  ///
+  /// This method can be called to force a sync operation regardless of the
+  /// current sync schedule.
   Future<void> scheduleSync() async {
-    // TODO: Implement schedule sync
+    if (!_isInitialized) {
+      debugPrint('PocketSyncEngine: Cannot sync, not initialized');
+      return;
+    }
+
+    debugPrint('PocketSyncEngine: Manual sync requested');
+    await _syncScheduler.forceSyncNow();
   }
 
-  Future<void> sync() async {
-    await _apiClient.uploadChanges();
-    await _apiClient.downloadChanges();
-  }
-
+  /// Pauses sync operations.
+  ///
+  /// This method stops the sync worker and change listener, effectively
+  /// pausing all sync operations.
   Future<void> stop() async {
-    // TODO: Implement stop
+    if (!_isInitialized) return;
+
+    debugPrint('PocketSyncEngine: Pausing sync operations');
+    _changeListener.stopListening();
+    await _syncWorker.stop();
   }
+
+  /// Resumes sync operations.
+  ///
+  /// This method restarts the sync worker and change listener, resuming
+  /// sync operations.
+  Future<void> resume() async {
+    if (!_isInitialized) {
+      await bootstrap();
+      return;
+    }
+
+    debugPrint('PocketSyncEngine: Resuming sync operations');
+    _changeListener.startListening();
+    await _syncWorker.start();
+  }
+
+  /// Disposes of resources used by the sync engine.
+  ///
+  /// This method should be called when the sync engine is no longer needed.
+  Future<void> dispose() async {
+    if (!_isInitialized) return;
+
+    debugPrint('PocketSyncEngine: Disposing sync components');
+    _changeListener.dispose();
+    await _syncWorker.stop();
+    _isInitialized = false;
+  }
+
+  /// Checks if the sync engine is currently initialized.
+  bool get isInitialized => _isInitialized;
+
+  /// Gets the current sync queue.
+  SyncQueue get syncQueue => _syncQueue;
 }

@@ -6,7 +6,7 @@ class DatabaseWatcher {
 
   DatabaseWatcher();
 
-  void setGlobalCallback(TableChangeCallback callback) {
+  void setGlobalCallback(TableChangeCallback? callback) {
     _globalCallback = callback;
   }
 

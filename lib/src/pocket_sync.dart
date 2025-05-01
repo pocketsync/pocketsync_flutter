@@ -1,4 +1,5 @@
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_engine.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 
@@ -27,18 +28,19 @@ class PocketSync {
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
   }) async {
+    final DatabaseWatcher databaseWatcher = DatabaseWatcher();
+    _instance._engine = PocketSyncEngine(
+      _instance._database,
+      options: options,
+      schemaManager: _schemaManager,
+      databaseWatcher: databaseWatcher,
+    );
     await _instance._database.initialize(
       databaseOptions,
-      _onDatabaseChange,
+      databaseWatcher,
     );
-    _instance._engine = PocketSyncEngine(_instance._database);
-    _instance._initialized = true;
-  }
 
-  static void _onDatabaseChange(String tableName, ChangeType changeType) {
-    // TODO: Implement database change
-    print('Database change: $tableName, $changeType');
-    _instance._engine.scheduleSync();
+    _instance._initialized = true;
   }
 
   void setUserId(String userId) => _instance._engine.setUserId(userId);
@@ -48,7 +50,7 @@ class PocketSync {
   Future<void> pause() async => await _instance._engine.stop();
 
   Future<void> dispose() async {
-    _instance._engine.stop();
+    _instance._engine.dispose();
     _instance._database.close();
     _instance._initialized = false;
   }

@@ -33,11 +33,13 @@ class PocketSyncOptions {
   final String projectId;
   final String authToken;
   final String serverUrl;
+  final int changeLogRetentionDays;
 
   PocketSyncOptions({
     required this.projectId,
     required this.authToken,
     required this.serverUrl,
+    this.changeLogRetentionDays = 30,
   });
 }
 

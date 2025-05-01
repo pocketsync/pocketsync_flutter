@@ -1,4 +1,5 @@
-import 'package:pocketsync_flutter/src/engine/sync_config.dart';
+import 'package:flutter/foundation.dart';
+import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SchemaManager {
@@ -8,7 +9,7 @@ class SchemaManager {
     for (final tableName in tables) {
       await db.transaction((txn) async {
         try {
-          // Add global ID column if it doesn't exist
+          // 1. First add global ID column if it doesn't exist
           var columnExists = await txn.rawQuery('''
             SELECT 1 FROM pragma_table_info('$tableName') WHERE name = 'ps_global_id'
           ''');
@@ -19,7 +20,7 @@ class SchemaManager {
             );
           }
 
-          // Create index if it doesn't exist
+          // 2. Create index if it doesn't exist
           var indexExists = await txn.rawQuery('''
             SELECT 1 FROM sqlite_master 
             WHERE type = 'index' AND name = 'idx_${tableName}_ps_global_id'
@@ -31,17 +32,18 @@ class SchemaManager {
             );
           }
 
-          // Generate global IDs for existing records that don't have one
+          // 3. Generate global IDs for existing records that don't have one
+          // This happens BEFORE triggers are created to avoid triggering updates
           await txn.execute('''
             UPDATE $tableName
             SET ps_global_id = hex(randomblob(16))
             WHERE ps_global_id IS NULL
           ''');
 
-          // Create triggers for change tracking
+          // 4. Only now create triggers for change tracking
           await _createTableTriggers(txn, tableName);
         } catch (e) {
-          print('Error setting up change tracking for $tableName: $e');
+          debugPrint('Error setting up change tracking for $tableName: $e');
           rethrow;
         }
       });
@@ -77,7 +79,6 @@ class SchemaManager {
         CREATE TABLE IF NOT EXISTS __pocketsync_device_state (
           device_id TEXT PRIMARY KEY,
           last_sync_timestamp INTEGER NULL,
-          device_name TEXT NULL,
           last_sync_status TEXT NULL
         )
       ''');
@@ -113,25 +114,28 @@ class SchemaManager {
       AFTER UPDATE ON $tableName
       WHEN ${generateUpdateCondition(columns)}
       BEGIN
+        -- First ensure global ID is set properly
+        UPDATE $tableName
+        SET ps_global_id = COALESCE(NEW.ps_global_id, OLD.ps_global_id, hex(randomblob(16)))
+        WHERE rowid = NEW.rowid AND (NEW.ps_global_id IS NULL);
+        
+        -- Now fetch the complete record with guaranteed ps_global_id for the change log
         -- Get the latest version number from existing changes
         INSERT INTO __pocketsync_changes (
           table_name, record_rowid, operation, timestamp, data, version
-        ) VALUES (
+        )
+        SELECT 
           '$tableName',
-          COALESCE(NEW.ps_global_id, OLD.ps_global_id, hex(randomblob(16))),
+          T.ps_global_id,
           'UPDATE',
           (strftime('%s', 'now') * 1000),
           json_object(
             'old', json_object(${columns.map((col) => "'$col', OLD.$col").join(', ')}),
-            'new', json_object(${columns.map((col) => "'$col', NEW.$col").join(', ')})
+            'new', json_object(${columns.map((col) => "'$col', T.$col").join(', ')})
           ),
-          COALESCE((SELECT MAX(version) FROM __pocketsync_changes WHERE table_name = '$tableName' AND record_rowid = NEW.ps_global_id), 0) + 1
-        );
-        
-        -- Ensure global ID is set
-        UPDATE $tableName
-        SET ps_global_id = COALESCE(NEW.ps_global_id, OLD.ps_global_id, hex(randomblob(16)))
-        WHERE rowid = NEW.rowid AND (NEW.ps_global_id IS NULL);
+          COALESCE((SELECT MAX(version) FROM __pocketsync_changes WHERE table_name = '$tableName' AND record_rowid = T.ps_global_id), 0) + 1
+        FROM $tableName T
+        WHERE T.rowid = NEW.rowid;
       END;
     ''');
 
@@ -145,18 +149,21 @@ class SchemaManager {
         SET ps_global_id = COALESCE(NEW.ps_global_id, hex(randomblob(16)))
         WHERE rowid = NEW.rowid AND NEW.ps_global_id IS NULL;
         
+        -- Use a subquery to get the complete record with the updated ps_global_id
         INSERT INTO __pocketsync_changes (
           table_name, record_rowid, operation, timestamp, data, version
-        ) VALUES (
+        )
+        SELECT 
           '$tableName',
-          (SELECT ps_global_id FROM $tableName WHERE rowid = NEW.rowid),
+          T.ps_global_id,
           'INSERT',
           (strftime('%s', 'now') * 1000),
           json_object(
-            'new', json_object(${columns.map((col) => "'$col', NEW.$col").join(', ')})
+            'new', json_object(${columns.map((col) => "'$col', T.$col").join(', ')})
           ),
           1  -- First version for new record
-        );
+        FROM $tableName T
+        WHERE T.rowid = NEW.rowid;
       END;
     ''');
 
@@ -165,6 +172,8 @@ class SchemaManager {
       CREATE TRIGGER IF NOT EXISTS after_delete_$tableName
       AFTER DELETE ON $tableName
       BEGIN
+        -- For DELETE operations, we need to ensure we have a valid global ID
+        -- even though the record is being deleted
         INSERT INTO __pocketsync_changes (
           table_name, record_rowid, operation, timestamp, data, version
         ) VALUES (
@@ -196,7 +205,12 @@ class SchemaManager {
   }
 
   String generateUpdateCondition(List<String> columns) {
-    final conditions = columns.map((col) => '''(
+    // Exclude ps_global_id from the update condition to avoid triggering
+    // changes when just the global ID is updated
+    final filteredColumns =
+        columns.where((col) => col != 'ps_global_id').toList();
+
+    final conditions = filteredColumns.map((col) => '''(
           OLD.$col IS NOT NEW.$col OR 
           (OLD.$col IS NULL AND NEW.$col IS NOT NULL) OR
           (OLD.$col IS NOT NULL AND NEW.$col IS NULL)
@@ -205,9 +219,9 @@ class SchemaManager {
   }
 
   // Clean up old sync records based on retention policy
-  Future<int> cleanupOldSyncRecords(Database db) async {
+  Future<int> cleanupOldSyncRecords(Database db, PocketSyncOptions options) async {
     try {
-      final retentionDays = SyncConfig.changeRetentionDays;
+      final retentionDays = options.changeLogRetentionDays;
 
       // Calculate cutoff timestamp
       final cutoffTimestamp = DateTime.now()
@@ -218,7 +232,7 @@ class SchemaManager {
       return await db.delete('__pocketsync_changes',
           where: 'synced = 1 AND timestamp < ?', whereArgs: [cutoffTimestamp]);
     } catch (e) {
-      print('Error cleaning up old sync records: $e');
+      debugPrint('Error cleaning up old sync records: $e');
       return 0;
     }
   }
@@ -233,7 +247,7 @@ class SchemaManager {
           // This will recreate triggers with current schema
           await _createTableTriggers(txn, tableName);
         } catch (e) {
-          print('Error updating triggers for $tableName: $e');
+          debugPrint('Error updating triggers for $tableName: $e');
           rethrow;
         }
       });
@@ -241,17 +255,23 @@ class SchemaManager {
   }
 
   // Register this device in the sync system
-  Future<void> registerDevice(Database db, String deviceId,
-      {String? deviceName}) async {
-    await db.insert(
+  Future<void> registerDevice(Database db, String deviceId) async {
+    final existingDevice = await db.query(
+      '__pocketsync_device_state',
+      where: 'device_id = ?',
+      whereArgs: [deviceId],
+    );
+
+    if (existingDevice.isEmpty) {
+      await db.insert(
         '__pocketsync_device_state',
         {
           'device_id': deviceId,
-          'device_name': deviceName,
           'last_sync_timestamp': null,
           'last_sync_status': 'NEVER_SYNCED'
         },
-        conflictAlgorithm: ConflictAlgorithm.replace);
+      );
+    }
   }
 
   // Method to monitor sync states

@@ -12,17 +12,16 @@ import 'package:sqflite/sqflite.dart';
 class PocketSyncDatabase extends DatabaseExecutor {
   Database? _db;
   final SchemaManager _schemaManager;
-  final DatabaseWatcher _databaseWatcher;
 
   PocketSyncDatabase({required SchemaManager schemaManager})
-      : _schemaManager = schemaManager,
-        _databaseWatcher = DatabaseWatcher();
+      : _schemaManager = schemaManager;
+
+  late final DatabaseWatcher _databaseWatcher;
 
   @override
   Database get database => _db!;
 
-  Future<void> initialize(
-      DatabaseOptions options, TableChangeCallback onDatabaseChange) async {
+  Future<void> initialize(DatabaseOptions options, DatabaseWatcher databaseWatcher) async {
     _db = await databaseFactory.openDatabase(
       options.dbPath,
       options: OpenDatabaseOptions(
@@ -58,8 +57,7 @@ class PocketSyncDatabase extends DatabaseExecutor {
         singleInstance: true,
       ),
     );
-
-    _databaseWatcher.setGlobalCallback(onDatabaseChange);
+    _databaseWatcher = databaseWatcher;
   }
 
   @override
