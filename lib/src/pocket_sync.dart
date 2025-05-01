@@ -82,6 +82,7 @@ class PocketSync {
   /// Be cautious when using this method as it will clear all change tracking data.
   Future<void> reset() async {
     // TODO: Implement reset logic
+    _instance._engine.reset();
   }
 
   /// Disposes of the PocketSync instance.

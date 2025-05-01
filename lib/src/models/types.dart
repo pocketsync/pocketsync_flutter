@@ -1,3 +1,4 @@
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:sqflite/sqflite.dart';
 
 enum ChangeType {
@@ -49,6 +50,16 @@ class PocketSyncOptions {
   /// Defaults to 30 days.
   final int changeLogRetentionDays;
 
+  /// The conflict resolution strategy.
+  ///
+  /// Defaults to `lastWriteWins`.
+  final ConflictResolutionStrategy conflictResolutionStrategy;
+
+  /// A custom conflict resolver function.
+  ///
+  /// This is only used when `conflictResolutionStrategy` is set to `custom`.
+  final ConflictResolver? customResolver;
+
   /// Whether to enable verbose logging.
   ///
   /// Defaults to `false`.
@@ -59,6 +70,8 @@ class PocketSyncOptions {
     required this.authToken,
     required this.serverUrl,
     this.changeLogRetentionDays = 30,
+    this.conflictResolutionStrategy = ConflictResolutionStrategy.lastWriteWins,
+    this.customResolver,
     this.verbose = false,
   });
 }
@@ -110,3 +123,21 @@ class DatabaseOptions {
     this.onOpen,
   });
 }
+
+
+enum ConflictResolutionStrategy {
+  /// Last-write-wins: most recent change based on timestamp wins
+  lastWriteWins,
+
+  /// Server changes always take precedence over local changes
+  serverWins,
+
+  /// Local/client changes always take precedence over server changes
+  clientWins,
+
+  /// Custom resolution strategy provided by the user
+  custom,
+}
+
+typedef ConflictResolver = Future<SyncChange> Function(
+    SyncChange localChange, SyncChange remoteChange,);

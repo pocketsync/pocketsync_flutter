@@ -1,23 +1,7 @@
 import 'dart:async';
-import 'package:pocketsync_flutter/src/engine/sync_change.dart';
+import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
-
-enum ConflictResolutionStrategy {
-  /// Last-write-wins: most recent change based on timestamp wins
-  lastWriteWins,
-
-  /// Server changes always take precedence over local changes
-  serverWins,
-
-  /// Local/client changes always take precedence over server changes
-  clientWins,
-
-  /// Custom resolution strategy provided by the user
-  custom,
-}
-
-typedef ConflictResolver = Future<SyncChange> Function(
-    SyncChange localChange, SyncChange remoteChange);
 
 class MergeEngine {
   final ConflictResolutionStrategy strategy;
@@ -30,7 +14,8 @@ class MergeEngine {
     if (strategy == ConflictResolutionStrategy.custom &&
         customResolver == null) {
       throw ArgumentError(
-          'Custom resolver must be provided when using custom strategy');
+        'Custom resolver must be provided when using custom strategy',
+      );
     }
   }
 

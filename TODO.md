@@ -1,2 +1,1 @@
 - Find the right timing to perform cleanupOldSyncRecords
-- Use ConflictResolver to handle conflicts

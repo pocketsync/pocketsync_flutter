@@ -48,7 +48,10 @@ class PocketSyncEngine {
         _deviceFingerprintProvider =
             deviceFingerprintProvider ?? DeviceFingerprintProvider(),
         _mergeEngine = mergeEngine ??
-            MergeEngine(strategy: ConflictResolutionStrategy.lastWriteWins);
+            MergeEngine(
+              strategy: options.conflictResolutionStrategy,
+              customResolver: options.customResolver,
+            );
 
   /// Initializes the sync engine and all its components.
   ///
@@ -150,6 +153,16 @@ class PocketSyncEngine {
     _databaseChangeListener.stopListening();
     _remoteChangeListener.stopListening();
     await _syncWorker.stop();
+  }
+
+  /// Resets the PocketSync engine.
+  ///
+  /// This method must be called to reset the engine.
+  /// Be cautious when using this method as it will clear all change tracking data.
+  Future<void> reset() async {
+    if (!_isInitialized) return;
+
+    schemaManager.reset(database.database);
   }
 
   /// Disposes of resources used by the sync engine.

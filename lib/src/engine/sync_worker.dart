@@ -4,9 +4,9 @@ import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
 import 'package:pocketsync_flutter/src/engine/merge_engine.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
-import 'package:pocketsync_flutter/src/engine/sync_change.dart';
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 

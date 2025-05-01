@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Manages the timing and scheduling of synchronization operations.

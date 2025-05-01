@@ -1,4 +1,4 @@
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/sql_utils.dart';
 import 'package:sqflite/sqflite.dart';
 

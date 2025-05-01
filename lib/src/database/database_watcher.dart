@@ -1,4 +1,4 @@
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 
 class DatabaseWatcher {
   TableChangeCallback? _globalCallback;

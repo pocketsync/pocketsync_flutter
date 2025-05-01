@@ -1,7 +1,7 @@
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/listeners/change_listener.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Listens for database changes and schedules sync operations accordingly.

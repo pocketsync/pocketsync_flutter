@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:pocketsync_flutter/src/engine/sync_change.dart';
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 

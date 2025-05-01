@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Represents a single change to be synchronized with the server.

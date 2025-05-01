@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:pocketsync_flutter/src/types.dart';
+import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
-import 'package:pocketsync_flutter/src/engine/sync_change.dart';
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/utils/sse_client.dart';
 
 class PocketSyncNetworkClient {
