@@ -61,6 +61,7 @@ class PocketSyncEngine {
     await schemaManager.registerDevice(database.database, deviceFingerprint);
 
     _apiClient.setupClient(options, deviceFingerprint);
+    _apiClient.listenForRemoteChanges();
 
     // Initialize components
     _syncQueue = SyncQueue();
@@ -159,6 +160,7 @@ class PocketSyncEngine {
     Logger.log('PocketSyncEngine: Disposing sync components');
     _changeListener.dispose();
     await _syncWorker.stop();
+    _apiClient.dispose();
     _isInitialized = false;
   }
 
