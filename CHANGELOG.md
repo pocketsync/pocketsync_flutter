@@ -1,3 +1,9 @@
+## 0.3.0
+- Complete refactoring of the engine
+
+### Breaking Changes
+- Renamed `pause` method to `stop`
+
 ## 0.2.0
 - Fix: Some sqlite functions were not available on some Android versions, preventing sync to work and database mutations to happen
 

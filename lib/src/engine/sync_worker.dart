@@ -1,8 +1,12 @@
 import 'dart:async';
 
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
+import 'package:pocketsync_flutter/src/engine/merge_engine.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
+import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
+import 'package:pocketsync_flutter/src/engine/sync_change.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
+import 'package:pocketsync_flutter/src/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -10,7 +14,10 @@ import 'package:sqflite/sqflite.dart';
 ///
 /// The SyncWorker is responsible for taking pending changes from the sync queue,
 /// aggregating them into efficient transmission chunks, and sending them to the server.
+/// It also processes remote changes received from the server during download operations.
 class SyncWorker {
+  final MergeEngine _mergeEngine;
+  final SchemaManager _schemaManager;
   final SyncQueue _syncQueue;
   final ChangeAggregator _changeAggregator;
   final PocketSyncNetworkClient _apiClient;
@@ -31,11 +38,15 @@ class SyncWorker {
     required ChangeAggregator changeAggregator,
     required PocketSyncNetworkClient apiClient,
     required Database database,
+    required MergeEngine mergeEngine,
+    required SchemaManager schemaManager,
     Duration? syncInterval,
   })  : _syncQueue = syncQueue,
         _changeAggregator = changeAggregator,
         _apiClient = apiClient,
         _database = database,
+        _mergeEngine = mergeEngine,
+        _schemaManager = schemaManager,
         _syncInterval = syncInterval ?? const Duration(minutes: 5);
 
   /// Starts the sync worker.
@@ -71,47 +82,214 @@ class SyncWorker {
 
   /// Processes the sync queue.
   ///
-  /// This method retrieves pending changes from the sync queue, aggregates them
-  /// into optimized chunks using the change aggregator, and sends them to the server.
+  /// This method handles both upload and download operations:
+  /// - For uploads: retrieves pending changes, aggregates them, and sends to server
+  /// - For downloads: processes remote changes received from the server
   Future<void> processQueue() async {
     if (_isSyncing || _syncQueue.isEmpty) return;
 
     try {
       _isSyncing = true;
 
-      // Get tables with pending changes
-      final tables = _syncQueue.getTablesWithPendingChanges();
+      // Process uploads first
+      await _processUploads();
 
-      // Process each table
-      for (final table in tables) {
-        try {
-          // Aggregate changes for the table
-          final changes = await _changeAggregator.aggregateChanges(table);
-
-          if (changes.isEmpty) {
-            continue;
-          }
-
-          // Send changes to the server
-          final success = await _apiClient.uploadChanges(changes);
-
-          if (success) {
-            // Mark changes as synced in the database
-            await _markChangesAsSynced(
-              table,
-              changes.map((c) => c.id).toList(),
-            );
-
-            // Mark changes as processed in the queue
-            _syncQueue.markTableProcessed(table);
-          }
-        } catch (e) {
-          Logger.log('SyncWorker: Error processing table $table: $e');
-        }
+      // Then process downloads if there are any
+      if (_syncQueue.hasDownloads) {
+        await _processDownloads(since: await getLastDownloadTimestamp());
       }
     } finally {
       _isSyncing = false;
     }
+  }
+
+  /// Processes pending uploads.
+  ///
+  /// This method retrieves pending upload changes from the sync queue, aggregates them
+  /// into optimized chunks using the change aggregator, and sends them to the server.
+  Future<void> _processUploads() async {
+    // Get tables with pending upload changes
+    final tables = _syncQueue.getTablesWithPendingUploads();
+
+    // Process each table
+    for (final table in tables) {
+      try {
+        // Aggregate changes for the table
+        final changes = await _changeAggregator.aggregateChanges(table);
+
+        if (changes.isEmpty) {
+          continue;
+        }
+
+        // Send changes to the server
+        final success = await _apiClient.uploadChanges(changes);
+
+        if (success) {
+          // Mark changes as synced in the database
+          await _markChangesAsSynced(
+            table,
+            changes.map((c) => c.id).toList(),
+          );
+
+          // Mark changes as processed in the queue
+          _syncQueue.markTableUploaded(table);
+        }
+      } catch (e) {
+        Logger.log('SyncWorker: Error processing upload for table $table: $e');
+      }
+    }
+  }
+
+  /// Processes pending downloads.
+  ///
+  /// This method handles the download process in three steps:
+  /// 1. Makes a REST call to the server to fetch available changes
+  /// 2. Merges remote changes with local data using the merge engine
+  /// 3. Applies the merged changes to the local database
+  Future<void> _processDownloads({DateTime? since}) async {
+    try {
+      // Check if there are pending download notifications
+      if (!_syncQueue.hasDownloads) {
+        return;
+      }
+
+      Logger.log('SyncWorker: Downloading changes from server');
+
+      // Make a REST call to download changes from the server
+      // This is where we fetch the actual SyncChange objects
+      final downloadedChanges = await _apiClient.downloadChanges(since: since);
+
+      // Add the downloaded changes to the queue for processing
+      if (downloadedChanges.isNotEmpty) {
+        _syncQueue.addRemoteChanges(downloadedChanges);
+      }
+
+      // Get all remote changes from the queue
+      final remoteChanges = _syncQueue.getRemoteChanges();
+
+      if (remoteChanges.isEmpty) {
+        Logger.log('SyncWorker: No changes received from server');
+        // Mark download as processed even if no changes were received
+        _syncQueue.markDownloadProcessed();
+        return;
+      }
+
+      Logger.log(
+          'SyncWorker: Processing ${remoteChanges.length} remote changes');
+
+      // Get any pending local changes that might conflict with remote changes
+      final localChanges = await _getPendingLocalChanges(remoteChanges);
+
+      // Merge remote changes with local changes using the merge engine
+      final mergedChanges =
+          await _mergeEngine.mergeChanges(localChanges, remoteChanges);
+
+      Logger.log('SyncWorker: Applying ${mergedChanges.length} merged changes');
+
+      // Apply merged changes to the local database
+      for (final change in mergedChanges) {
+        try {
+          await _applyChange(change);
+        } catch (e) {
+          Logger.log('SyncWorker: Error applying merged change: $e');
+        }
+      }
+
+      // Clear processed remote changes
+      _syncQueue
+        ..clearRemoteChanges()
+        ..markDownloadProcessed();
+
+      // Update device state
+      await _database.rawUpdate(
+        'UPDATE __pocketsync_device_state SET last_download_timestamp = ?',
+        [DateTime.now().millisecondsSinceEpoch],
+      );
+    } catch (e) {
+      Logger.log('SyncWorker: Error processing downloads: $e');
+    }
+  }
+
+  /// Applies a change to the local database.
+  ///
+  /// This method applies a change to the local database, whether it's from
+  /// a remote source or a merged result.
+  Future<void> _applyChange(SyncChange change) async {
+    final tableName = change.tableName;
+    final recordId = change.recordId;
+    final data = change.data;
+
+    await _schemaManager.disableTriggers(_database);
+
+    try {
+      switch (change.operation) {
+        case ChangeType.insert:
+          // Insert new record
+          await _database.insert(tableName, data);
+          Logger.log('SyncWorker: Applied insert for $tableName:$recordId');
+          break;
+
+        case ChangeType.update:
+          // Update existing record
+          await _database.update(
+            tableName,
+            data,
+            where: 'id = ?',
+            whereArgs: [recordId],
+          );
+          Logger.log('SyncWorker: Applied update for $tableName:$recordId');
+          break;
+
+        case ChangeType.delete:
+          // Delete record
+          await _database.delete(
+            tableName,
+            where: 'id = ?',
+            whereArgs: [recordId],
+          );
+          Logger.log('SyncWorker: Applied delete for $tableName:$recordId');
+          break;
+      }
+    } finally {
+      await _schemaManager.setupChangeTracking(_database);
+    }
+  }
+
+  /// Retrieves pending local changes that might conflict with remote changes.
+  ///
+  /// This method queries the database for any pending local changes that affect
+  /// the same records as the incoming remote changes.
+  Future<List<SyncChange>> _getPendingLocalChanges(
+      List<SyncChange> remoteChanges) async {
+    final localChanges = <SyncChange>[];
+
+    // Create a set of table:recordId keys for quick lookup
+    final remoteChangeKeys =
+        remoteChanges.map((c) => '${c.tableName}:${c.recordId}').toSet();
+
+    // Query the database for pending changes that match the remote records
+    for (final key in remoteChangeKeys) {
+      final parts = key.split(':');
+      if (parts.length != 2) continue;
+
+      final tableName = parts[0];
+      final recordId = parts[1];
+
+      // Query for pending changes for this record
+      final rows = await _database.query(
+        '__pocketsync_changes',
+        where: 'table_name = ? AND record_rowid = ? AND synced = 0',
+        whereArgs: [tableName, recordId],
+      );
+
+      // Convert rows to SyncChange objects
+      final changes = SyncChange.fromDatabaseRecords(rows);
+      localChanges.addAll(changes);
+    }
+
+    Logger.log(
+        'SyncWorker: Found ${localChanges.length} pending local changes that might conflict');
+    return localChanges;
   }
 
   /// Marks changes as synced in the database.
@@ -126,6 +304,25 @@ class SyncWorker {
     await _database.rawUpdate(
       'UPDATE __pocketsync_changes SET synced = 1 WHERE id IN (${changeIds.map((_) => '?').join(', ')})',
       changeIds,
+    );
+
+    // Update device state
+    await _database.rawUpdate(
+      'UPDATE __pocketsync_device_state SET last_upload_timestamp = ?',
+      [DateTime.now().millisecondsSinceEpoch],
+    );
+  }
+
+  Future<DateTime> getLastDownloadTimestamp() async {
+    final rows = await _database.query(
+      '__pocketsync_device_state',
+      where: 'device_id = ?',
+    );
+    if (rows.isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(
+      rows[0]['last_download_timestamp'] as int,
     );
   }
 

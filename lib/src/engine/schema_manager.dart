@@ -78,7 +78,8 @@ class SchemaManager {
       await txn.execute('''
         CREATE TABLE IF NOT EXISTS __pocketsync_device_state (
           device_id TEXT PRIMARY KEY,
-          last_sync_timestamp INTEGER NULL,
+          last_upload_timestamp INTEGER NULL,
+          last_download_timestamp INTEGER NULL,
           last_sync_status TEXT NULL
         )
       ''');
@@ -219,7 +220,8 @@ class SchemaManager {
   }
 
   // Clean up old sync records based on retention policy
-  Future<int> cleanupOldSyncRecords(Database db, PocketSyncOptions options) async {
+  Future<int> cleanupOldSyncRecords(
+      Database db, PocketSyncOptions options) async {
     try {
       final retentionDays = options.changeLogRetentionDays;
 
@@ -267,7 +269,8 @@ class SchemaManager {
         '__pocketsync_device_state',
         {
           'device_id': deviceId,
-          'last_sync_timestamp': null,
+          'last_upload_timestamp': null,
+          'last_download_timestamp': null,
           'last_sync_status': 'NEVER_SYNCED'
         },
       );
@@ -284,5 +287,20 @@ class SchemaManager {
       'devices': deviceStates,
       'pending_changes': pendingChanges.first['count'],
     };
+  }
+
+  Future<void> disableTriggers(Database db) async {
+    final tables = await _getUserTables(db);
+
+    for (final tableName in tables) {
+      await db.transaction((txn) async {
+        try {
+          await _dropExistingTriggers(txn, tableName);
+        } catch (e) {
+          Logger.log('Error updating triggers for $tableName: $e');
+          rethrow;
+        }
+      });
+    }
   }
 }

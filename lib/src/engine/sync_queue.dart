@@ -1,3 +1,4 @@
+import 'package:pocketsync_flutter/src/engine/sync_change.dart';
 import 'package:pocketsync_flutter/src/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 
@@ -5,77 +6,91 @@ import 'package:pocketsync_flutter/src/utils/logger.dart';
 ///
 /// The SyncQueue stores information about database changes that need to be
 /// synchronized with the server. It provides methods for adding, retrieving,
-/// and managing these changes.
+/// and managing these changes for both upload and download operations.
 class SyncQueue {
-  /// Map of table names to sets of change types
+  /// Map of table names to sets of change types for upload operations
   /// This allows us to efficiently track which tables have pending changes
   /// and what types of changes they are.
-  final Map<String, Set<ChangeType>> _pendingChanges = {};
+  final Map<String, Set<ChangeType>> _pendingUploads = {};
 
-  /// Adds a change to the queue.
+  /// Flag indicating whether there's a pending download operation
+  bool _hasPendingDownload = false;
+
+  /// List of remote changes that have been received and need to be processed
+  final List<SyncChange> _remoteChanges = [];
+
+  /// Adds a local change to the upload queue.
   ///
   /// This method records that a change of type [changeType] has occurred
-  /// in the table [tableName].
-  void addChange(String tableName, ChangeType changeType) {
-    _pendingChanges
+  /// in the table [tableName] and needs to be uploaded to the server.
+  void addLocalChange(String tableName, ChangeType changeType) {
+    _pendingUploads
         .putIfAbsent(tableName, () => <ChangeType>{})
         .add(changeType);
     Logger.log(
-        'SyncQueue: Added ${changeType.name} change for table $tableName');
+        'SyncQueue: Added ${changeType.name} upload change for table $tableName');
   }
 
-  /// Checks if the queue is empty.
-  bool get isEmpty => _pendingChanges.isEmpty;
-
-  /// Checks if the queue has any pending changes.
-  bool get isNotEmpty => _pendingChanges.isNotEmpty;
-
-  /// Gets a map of all pending changes.
+  /// Adds a notification that remote changes are available.
   ///
-  /// Returns a copy of the internal map to prevent external modification.
-  Map<String, Set<ChangeType>> getPendingChanges() {
-    return Map.from(_pendingChanges);
+  /// This method is called when the client receives a notification from the server
+  /// that changes are available. The client will then schedule a REST call to
+  /// download the actual changes from the server.
+  void addRemoteChange() {
+    _hasPendingDownload = true;
+    Logger.log(
+        'SyncQueue: Added remote change notification, download will be scheduled');
   }
 
-  /// Gets a list of table names that have pending changes.
-  List<String> getTablesWithPendingChanges() {
-    return _pendingChanges.keys.toList();
-  }
-
-  /// Checks if a specific table has pending changes.
-  bool hasChangesForTable(String tableName) {
-    return _pendingChanges.containsKey(tableName) &&
-        _pendingChanges[tableName]!.isNotEmpty;
-  }
-
-  /// Checks if a specific table has a specific type of pending change.
-  bool hasChangeTypeForTable(String tableName, ChangeType changeType) {
-    return _pendingChanges.containsKey(tableName) &&
-        _pendingChanges[tableName]!.contains(changeType);
-  }
-
-  /// Marks changes for a specific table as processed.
+  /// Adds a list of remote changes to be processed.
   ///
-  /// This removes all pending changes for the specified table.
-  void markTableProcessed(String tableName) {
-    _pendingChanges.remove(tableName);
-    Logger.log('SyncQueue: Marked table $tableName as processed');
+  /// This method is called after the client has made a REST call to download
+  /// changes from the server. The downloaded SyncChange objects are stored in the queue
+  /// for processing.
+  void addRemoteChanges(List<SyncChange> changes) {
+    _remoteChanges.addAll(changes);
+
+    // If we've received changes, we don't need to add a notification since
+    // we already have the actual changes to process
+    Logger.log('SyncQueue: Added ${changes.length} remote changes from server');
   }
 
-  /// Marks all pending changes as processed.
+  /// Gets the list of remote changes that need to be processed.
+  List<SyncChange> getRemoteChanges() {
+    return List.from(_remoteChanges);
+  }
+
+  /// Clears the list of remote changes after they have been processed.
+  void clearRemoteChanges() {
+    _remoteChanges.clear();
+    Logger.log('SyncQueue: Cleared remote changes');
+  }
+
+  /// Checks if the queue is empty (both uploads and downloads).
+  bool get isEmpty =>
+      _pendingUploads.isEmpty && !_hasPendingDownload && _remoteChanges.isEmpty;
+
+  /// Checks if there are any pending downloads.
+  bool get hasDownloads => _hasPendingDownload;
+
+  /// Gets a list of table names that have pending upload changes.
+  List<String> getTablesWithPendingUploads() {
+    return _pendingUploads.keys.toList();
+  }
+
+  /// Marks upload changes for a specific table as processed.
   ///
-  /// This clears the entire queue.
-  void markAllProcessed() {
-    _pendingChanges.clear();
-    Logger.log('SyncQueue: Marked all changes as processed');
+  /// This removes all pending upload changes for the specified table.
+  void markTableUploaded(String tableName) {
+    _pendingUploads.remove(tableName);
+    Logger.log('SyncQueue: Marked table $tableName as uploaded');
   }
 
-  /// Gets the number of tables with pending changes.
-  int get pendingTableCount => _pendingChanges.length;
-
-  /// Gets the total number of pending changes across all tables.
-  int get totalPendingChanges {
-    return _pendingChanges.values
-        .fold(0, (sum, changes) => sum + changes.length);
+  /// Marks download operation as processed.
+  ///
+  /// This clears the download flag since we treat downloads as a single operation.
+  void markDownloadProcessed() {
+    _hasPendingDownload = false;
+    Logger.log('SyncQueue: Marked download as processed');
   }
 }

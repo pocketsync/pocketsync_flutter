@@ -2,8 +2,10 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
-import 'package:pocketsync_flutter/src/engine/database_change_listener.dart';
+import 'package:pocketsync_flutter/src/engine/listeners/database_change_listener.dart';
 import 'package:pocketsync_flutter/src/engine/device_fingerprint_provider.dart';
+import 'package:pocketsync_flutter/src/engine/listeners/remote_change_listener.dart';
+import 'package:pocketsync_flutter/src/engine/merge_engine.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
@@ -25,9 +27,11 @@ class PocketSyncEngine {
 
   late final SyncQueue _syncQueue;
   late final ChangeAggregator _changeAggregator;
-  late final DatabaseChangeListener _changeListener;
+  late final DatabaseChangeListener _databaseChangeListener;
+  late final RemoteChangeListener _remoteChangeListener;
   late final SyncScheduler _syncScheduler;
   late final SyncWorker _syncWorker;
+  late final MergeEngine _mergeEngine;
 
   bool _isInitialized = false;
 
@@ -38,10 +42,13 @@ class PocketSyncEngine {
     required this.databaseWatcher,
     PocketSyncNetworkClient? apiClient,
     DeviceFingerprintProvider? deviceFingerprintProvider,
+    MergeEngine? mergeEngine,
   })  : _apiClient =
             apiClient ?? PocketSyncNetworkClient(baseUrl: options.serverUrl),
         _deviceFingerprintProvider =
-            deviceFingerprintProvider ?? DeviceFingerprintProvider();
+            deviceFingerprintProvider ?? DeviceFingerprintProvider(),
+        _mergeEngine = mergeEngine ??
+            MergeEngine(strategy: ConflictResolutionStrategy.lastWriteWins);
 
   /// Initializes the sync engine and all its components.
   ///
@@ -75,9 +82,14 @@ class PocketSyncEngine {
       onSyncRequired: _performSync,
     );
 
-    _changeListener = DatabaseChangeListener(
+    _databaseChangeListener = DatabaseChangeListener(
       syncScheduler: _syncScheduler,
       databaseWatcher: databaseWatcher,
+    );
+
+    _remoteChangeListener = RemoteChangeListener(
+      syncScheduler: _syncScheduler,
+      apiClient: _apiClient,
     );
 
     _syncWorker = SyncWorker(
@@ -85,10 +97,13 @@ class PocketSyncEngine {
       changeAggregator: _changeAggregator,
       apiClient: _apiClient,
       database: database.database,
+      mergeEngine: _mergeEngine,
+      schemaManager: schemaManager,
     );
 
     // Start listening for database changes
-    _changeListener.startListening();
+    _databaseChangeListener.startListening();
+    _remoteChangeListener.startListening();
 
     _isInitialized = true;
     Logger.log('PocketSyncEngine: Bootstrap complete');
@@ -132,23 +147,9 @@ class PocketSyncEngine {
     if (!_isInitialized) return;
 
     Logger.log('PocketSyncEngine: Pausing sync operations');
-    _changeListener.stopListening();
+    _databaseChangeListener.stopListening();
+    _remoteChangeListener.stopListening();
     await _syncWorker.stop();
-  }
-
-  /// Resumes sync operations.
-  ///
-  /// This method restarts the sync worker and change listener, resuming
-  /// sync operations.
-  Future<void> resume() async {
-    if (!_isInitialized) {
-      await bootstrap();
-      return;
-    }
-
-    Logger.log('PocketSyncEngine: Resuming sync operations');
-    _changeListener.startListening();
-    await _syncWorker.start();
   }
 
   /// Disposes of resources used by the sync engine.
@@ -158,7 +159,8 @@ class PocketSyncEngine {
     if (!_isInitialized) return;
 
     Logger.log('PocketSyncEngine: Disposing sync components');
-    _changeListener.dispose();
+    _databaseChangeListener.dispose();
+    _remoteChangeListener.dispose();
     await _syncWorker.stop();
     _apiClient.dispose();
     _isInitialized = false;

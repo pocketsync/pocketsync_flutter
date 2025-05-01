@@ -68,7 +68,21 @@ class PocketSync {
   /// Stops the PocketSync engine.
   ///
   /// This method must be called to stop the engine.
-  Future<void> pause() async => await _instance._engine.stop();
+  Future<void> stop() async => await _instance._engine.stop();
+
+  /// Schedules a sync operation.
+  ///
+  /// This method can be called to force a sync operation regardless of the
+  /// current sync schedule.
+  Future<void> scheduleSync() async => await _instance._engine.scheduleSync();
+
+  /// Resets the PocketSync engine.
+  ///
+  /// This method must be called to reset the engine.
+  /// Be cautious when using this method as it will clear all change tracking data.
+  Future<void> reset() async {
+    // TODO: Implement reset logic
+  }
 
   /// Disposes of the PocketSync instance.
   ///
