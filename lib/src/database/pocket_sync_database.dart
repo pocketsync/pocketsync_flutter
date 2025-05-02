@@ -341,14 +341,14 @@ extension WatchExtension on PocketSyncDatabase {
     _watchers.putIfAbsent(queryKey, () => []).add(watcher);
 
     // Initial query
-    watcher.notify(this);
+    watcher.notify(database);
 
     // Set up change listeners for relevant tables
     void handleChange(String table, ChangeType _) {
       if (tables.contains(table)) {
         _debounceTimer?.cancel();
         _debounceTimer = Timer(const Duration(milliseconds: _debounceMs), () {
-          watcher.notify(this);
+          watcher.notify(database);
         });
       }
     }

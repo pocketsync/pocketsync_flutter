@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
-import 'package:pocketsync_flutter/src/utils/sse_client.dart';
 
 class PocketSyncNetworkClient {
   final String _baseUrl;
@@ -21,9 +20,7 @@ class PocketSyncNetworkClient {
     'Accept': 'application/json',
   };
 
-  StreamSubscription<SseEvent>? _remoteChangesSubscription;
-
-  SseClient? _sseClient;
+  StreamSubscription<String>? _remoteChangesSubscription;
 
   void setupClient(PocketSyncOptions options, String deviceId) {
     _deviceId = deviceId;
@@ -33,23 +30,15 @@ class PocketSyncNetworkClient {
       'x-project-id': options.projectId,
       'x-device-id': deviceId,
     });
-
-    Logger.log(
-        'PocketSyncNetworkClient: Initialized with device ID: $deviceId');
   }
 
   void setUserId(String userId) {
     _userId = userId;
     _headers['x-user-id'] = userId;
-    Logger.log('PocketSyncNetworkClient: User ID set to: $userId');
   }
 
   void listenForRemoteChanges({void Function()? onRemoteChange}) async {
-    _sseClient ??= SseClient('$_baseUrl/sync/notifications', headers: _headers);
-    _sseClient!.connect();
-    _remoteChangesSubscription = _sseClient!.stream.listen((event) {
-      onRemoteChange?.call();
-    });
+    // We will use Socket.io
   }
 
   /// Uploads a list of changes to the server.
@@ -57,22 +46,16 @@ class PocketSyncNetworkClient {
   /// This method takes a list of [SyncChange] objects, bundles them into a
   /// [SyncChangeBatch], and sends them to the server for processing.
   Future<bool> uploadChanges(List<SyncChange> changes) async {
-    if (changes.isEmpty) {
+    if (changes.isEmpty || _deviceId == null || _userId == null) {
       Logger.log('PocketSyncNetworkClient: No changes to upload');
       return true;
-    }
-
-    if (_deviceId == null) {
-      Logger.log(
-          'PocketSyncNetworkClient: Device ID not set, cannot upload changes');
-      return false;
     }
 
     try {
       // Create a batch of changes
       final batch = SyncChangeBatch(
         deviceId: _deviceId!,
-        userId: _userId,
+        userId: _userId!,
         changes: changes,
       );
 
@@ -102,24 +85,27 @@ class PocketSyncNetworkClient {
   /// This method makes a REST call to the server to fetch available changes
   /// and adds them to the SyncQueue for processing.
   Future<List<SyncChange>> downloadChanges({DateTime? since}) async {
-    if (_deviceId == null) {
+    if (_deviceId == null || _userId == null) {
       Logger.log(
-          'PocketSyncNetworkClient: Device ID not set, cannot download changes');
+          'PocketSyncNetworkClient: Device ID or User ID not set, cannot download changes');
       return [];
     }
 
     try {
       // Use provided timestamp or the last one we stored
-      final timestamp = since ?? _lastFetchedTimestamp ?? DateTime.fromMillisecondsSinceEpoch(0);
-      
-      Logger.log('PocketSyncNetworkClient: Downloading changes since ${timestamp.toIso8601String()}');
-      
+      final timestamp = since ??
+          _lastFetchedTimestamp ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+
+      Logger.log(
+          'PocketSyncNetworkClient: Downloading changes since ${timestamp.toIso8601String()}');
+
       // TODO: Implement actual HTTP request to download changes
       // For now, just simulate a successful download with mock data
-      
+
       // Simulate network delay
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Create some mock changes for testing
       final mockChanges = [
         SyncChange(
@@ -129,7 +115,11 @@ class PocketSyncNetworkClient {
           operation: ChangeType.insert,
           timestamp: DateTime.now().millisecondsSinceEpoch,
           version: 1,
-          data: {'id': 'note123', 'title': 'New Note', 'content': 'This is a test note'},
+          data: {
+            'id': 'note123',
+            'title': 'New Note',
+            'content': 'This is a test note'
+          },
         ),
         SyncChange(
           id: 1002,
@@ -141,12 +131,13 @@ class PocketSyncNetworkClient {
           data: {'id': 'task456', 'title': 'Updated Task', 'completed': true},
         ),
       ];
-      
+
       // Update the last fetched timestamp
       _lastFetchedTimestamp = DateTime.now();
-      
-      Logger.log('PocketSyncNetworkClient: Downloaded ${mockChanges.length} changes');
-      
+
+      Logger.log(
+          'PocketSyncNetworkClient: Downloaded ${mockChanges.length} changes');
+
       return mockChanges;
     } catch (e) {
       Logger.log('PocketSyncNetworkClient: Error downloading changes: $e');
@@ -157,14 +148,10 @@ class PocketSyncNetworkClient {
   void stopListening() {
     _remoteChangesSubscription?.cancel();
     _remoteChangesSubscription = null;
-    _sseClient?.disconnect();
-    _sseClient = null;
   }
 
   void dispose() {
     _remoteChangesSubscription?.cancel();
     _remoteChangesSubscription = null;
-    _sseClient?.disconnect();
-    _sseClient = null;
   }
 }

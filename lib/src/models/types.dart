@@ -124,7 +124,6 @@ class DatabaseOptions {
   });
 }
 
-
 enum ConflictResolutionStrategy {
   /// Last-write-wins: most recent change based on timestamp wins
   lastWriteWins,
@@ -140,4 +139,6 @@ enum ConflictResolutionStrategy {
 }
 
 typedef ConflictResolver = Future<SyncChange> Function(
-    SyncChange localChange, SyncChange remoteChange,);
+  SyncChange localChange,
+  SyncChange remoteChange,
+);

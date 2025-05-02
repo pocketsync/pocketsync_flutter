@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
 import 'package:pocketsync_flutter/src/engine/merge_engine.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
@@ -22,6 +23,7 @@ class SyncWorker {
   final ChangeAggregator _changeAggregator;
   final PocketSyncNetworkClient _apiClient;
   final Database _database;
+  final DatabaseWatcher _databaseWatcher;
 
   bool _isRunning = false;
   bool _isSyncing = false;
@@ -41,13 +43,15 @@ class SyncWorker {
     required MergeEngine mergeEngine,
     required SchemaManager schemaManager,
     Duration? syncInterval,
+    DatabaseWatcher? databaseWatcher,
   })  : _syncQueue = syncQueue,
         _changeAggregator = changeAggregator,
         _apiClient = apiClient,
         _database = database,
         _mergeEngine = mergeEngine,
         _schemaManager = schemaManager,
-        _syncInterval = syncInterval ?? const Duration(minutes: 5);
+        _syncInterval = syncInterval ?? const Duration(minutes: 5),
+        _databaseWatcher = databaseWatcher ?? DatabaseWatcher();
 
   /// Starts the sync worker.
   ///
@@ -148,45 +152,27 @@ class SyncWorker {
   /// 3. Applies the merged changes to the local database
   Future<void> _processDownloads({DateTime? since}) async {
     try {
-      // Check if there are pending download notifications
       if (!_syncQueue.hasDownloads) {
         return;
       }
 
-      Logger.log('SyncWorker: Downloading changes from server');
-
-      // Make a REST call to download changes from the server
-      // This is where we fetch the actual SyncChange objects
       final downloadedChanges = await _apiClient.downloadChanges(since: since);
 
-      // Add the downloaded changes to the queue for processing
       if (downloadedChanges.isNotEmpty) {
         _syncQueue.addRemoteChanges(downloadedChanges);
       }
 
-      // Get all remote changes from the queue
       final remoteChanges = _syncQueue.getRemoteChanges();
 
       if (remoteChanges.isEmpty) {
-        Logger.log('SyncWorker: No changes received from server');
-        // Mark download as processed even if no changes were received
         _syncQueue.markDownloadProcessed();
         return;
       }
 
-      Logger.log(
-          'SyncWorker: Processing ${remoteChanges.length} remote changes');
-
-      // Get any pending local changes that might conflict with remote changes
       final localChanges = await _getPendingLocalChanges(remoteChanges);
-
-      // Merge remote changes with local changes using the merge engine
       final mergedChanges =
           await _mergeEngine.mergeChanges(localChanges, remoteChanges);
 
-      Logger.log('SyncWorker: Applying ${mergedChanges.length} merged changes');
-
-      // Apply merged changes to the local database
       for (final change in mergedChanges) {
         try {
           await _applyChange(change);
@@ -205,9 +191,20 @@ class SyncWorker {
         'UPDATE __pocketsync_device_state SET last_download_timestamp = ?',
         [DateTime.now().millisecondsSinceEpoch],
       );
+
+      // Notify listeners about the changes
+      // This is necessary because the engine internally does not use the database wrapper
+      // and does not notify listeners about changes.
+      for (final table in _getTables(remoteChanges)) {
+        _databaseWatcher.notifyListeners(table, ChangeType.update);
+      }
     } catch (e) {
       Logger.log('SyncWorker: Error processing downloads: $e');
     }
+  }
+
+  Set<String> _getTables(Iterable<SyncChange> changes) {
+    return changes.map((c) => c.tableName).toSet();
   }
 
   /// Applies a change to the local database.
@@ -226,7 +223,6 @@ class SyncWorker {
         case ChangeType.insert:
           // Insert new record
           await _database.insert(tableName, data);
-          Logger.log('SyncWorker: Applied insert for $tableName:$recordId');
           break;
 
         case ChangeType.update:
@@ -237,7 +233,6 @@ class SyncWorker {
             where: 'id = ?',
             whereArgs: [recordId],
           );
-          Logger.log('SyncWorker: Applied update for $tableName:$recordId');
           break;
 
         case ChangeType.delete:
@@ -247,7 +242,6 @@ class SyncWorker {
             where: 'id = ?',
             whereArgs: [recordId],
           );
-          Logger.log('SyncWorker: Applied delete for $tableName:$recordId');
           break;
       }
     } finally {
@@ -287,8 +281,6 @@ class SyncWorker {
       localChanges.addAll(changes);
     }
 
-    Logger.log(
-        'SyncWorker: Found ${localChanges.length} pending local changes that might conflict');
     return localChanges;
   }
 
@@ -319,10 +311,11 @@ class SyncWorker {
       where: 'device_id = ?',
     );
     if (rows.isEmpty) {
-      return DateTime.fromMillisecondsSinceEpoch(0);
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     }
     return DateTime.fromMillisecondsSinceEpoch(
       rows[0]['last_download_timestamp'] as int,
+      isUtc: true,
     );
   }
 

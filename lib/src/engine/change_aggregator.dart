@@ -25,9 +25,6 @@ class ChangeAggregator {
   /// 
   /// Returns a list of [SyncChange] objects ready for transmission to the server.
   Future<List<SyncChange>> aggregateChanges(String tableName) async {
-    Logger.log('ChangeAggregator: Aggregating changes for table $tableName');
-
-    // Get all unsynced changes for this table
     final rawChanges = await _database.query(
       '__pocketsync_changes',
       where: 'table_name = ? AND synced = 0',
@@ -38,9 +35,6 @@ class ChangeAggregator {
     if (rawChanges.isEmpty) {
       return [];
     }
-
-    Logger.log(
-        'ChangeAggregator: Found ${rawChanges.length} raw changes for table $tableName');
 
     // Group changes by record ID
     final changesByRecord = <String, List<Map<String, dynamic>>>{};
@@ -68,11 +62,7 @@ class ChangeAggregator {
         optimizedChanges.add(optimizedChange);
       }
     }
-
-    Logger.log(
-        'ChangeAggregator: Optimized to ${optimizedChanges.length} changes for table $tableName');
     
-    // Convert optimized changes to SyncChange objects
     return SyncChange.fromDatabaseRecords(optimizedChanges);
   }
 

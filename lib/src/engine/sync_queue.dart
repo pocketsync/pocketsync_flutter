@@ -1,6 +1,5 @@
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
-import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Manages a queue of pending changes to be synchronized.
 ///
@@ -27,8 +26,6 @@ class SyncQueue {
     _pendingUploads
         .putIfAbsent(tableName, () => <ChangeType>{})
         .add(changeType);
-    Logger.log(
-        'SyncQueue: Added ${changeType.name} upload change for table $tableName');
   }
 
   /// Adds a notification that remote changes are available.
@@ -38,8 +35,6 @@ class SyncQueue {
   /// download the actual changes from the server.
   void addRemoteChange() {
     _hasPendingDownload = true;
-    Logger.log(
-        'SyncQueue: Added remote change notification, download will be scheduled');
   }
 
   /// Adds a list of remote changes to be processed.
@@ -48,11 +43,9 @@ class SyncQueue {
   /// changes from the server. The downloaded SyncChange objects are stored in the queue
   /// for processing.
   void addRemoteChanges(List<SyncChange> changes) {
-    _remoteChanges.addAll(changes);
-
     // If we've received changes, we don't need to add a notification since
     // we already have the actual changes to process
-    Logger.log('SyncQueue: Added ${changes.length} remote changes from server');
+    _remoteChanges.addAll(changes);
   }
 
   /// Gets the list of remote changes that need to be processed.
@@ -63,7 +56,6 @@ class SyncQueue {
   /// Clears the list of remote changes after they have been processed.
   void clearRemoteChanges() {
     _remoteChanges.clear();
-    Logger.log('SyncQueue: Cleared remote changes');
   }
 
   /// Checks if the queue is empty (both uploads and downloads).
@@ -83,7 +75,6 @@ class SyncQueue {
   /// This removes all pending upload changes for the specified table.
   void markTableUploaded(String tableName) {
     _pendingUploads.remove(tableName);
-    Logger.log('SyncQueue: Marked table $tableName as uploaded');
   }
 
   /// Marks download operation as processed.
@@ -91,6 +82,5 @@ class SyncQueue {
   /// This clears the download flag since we treat downloads as a single operation.
   void markDownloadProcessed() {
     _hasPendingDownload = false;
-    Logger.log('SyncQueue: Marked download as processed');
   }
 }

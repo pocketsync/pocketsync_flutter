@@ -24,7 +24,6 @@ class SyncScheduler {
   bool _downloadScheduled = false;
   bool _isUploadInProgress = false;
   bool _isDownloadInProgress = false;
-  DateTime _lastSyncTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Creates a new SyncScheduler.
   ///
@@ -47,7 +46,6 @@ class SyncScheduler {
     _syncQueue.addLocalChange(tableName, changeType);
 
     if (_isUploadInProgress) {
-      Logger.log('SyncScheduler: Upload already in progress, change queued');
       return;
     }
 
@@ -64,13 +62,10 @@ class SyncScheduler {
     _syncQueue.addRemoteChange();
 
     if (_isDownloadInProgress) {
-      Logger.log('SyncScheduler: Download already in progress, change queued');
       return;
     }
 
     if (_uploadScheduled || _isUploadInProgress) {
-      Logger.log(
-          'SyncScheduler: Upload scheduled/in progress, postponing download');
       return;
     }
 
@@ -81,17 +76,13 @@ class SyncScheduler {
     _downloadScheduled = true;
     _downloadDebounceTimer =
         Timer(_debounceInterval, _evaluateDownloadConditions);
-    Logger.log(
-        'SyncScheduler: Download scheduled in ${_debounceInterval.inSeconds} seconds');
   }
 
   /// Forces an immediate sync operation regardless of current conditions.
   Future<void> forceSyncNow() async {
-    Logger.log('SyncScheduler: Force sync requested');
     _cancelExistingTimers();
 
     if (_isUploadInProgress || _isDownloadInProgress) {
-      Logger.log('SyncScheduler: Cannot force sync, sync already in progress');
       return;
     }
 
@@ -109,7 +100,6 @@ class SyncScheduler {
     _uploadScheduled = false;
 
     if (_syncQueue.isEmpty) {
-      Logger.log('SyncScheduler: No changes to upload');
       return;
     }
 
@@ -120,7 +110,6 @@ class SyncScheduler {
     _downloadScheduled = false;
 
     if (_syncQueue.isEmpty) {
-      Logger.log('SyncScheduler: No changes to download');
       return;
     }
 
@@ -129,16 +118,13 @@ class SyncScheduler {
 
   Future<void> _performUpload() async {
     if (_isUploadInProgress) {
-      Logger.log('SyncScheduler: Upload already in progress, skipping');
       return;
     }
 
     try {
       _isUploadInProgress = true;
-      Logger.log('SyncScheduler: Starting upload operation');
 
       await _onSyncRequired();
-      _updateSyncTime();
     } catch (e) {
       Logger.log('SyncScheduler: Error during upload: $e');
     } finally {
@@ -148,16 +134,13 @@ class SyncScheduler {
 
   Future<void> _performDownload() async {
     if (_isDownloadInProgress) {
-      Logger.log('SyncScheduler: Download already in progress, skipping');
       return;
     }
 
     try {
       _isDownloadInProgress = true;
-      Logger.log('SyncScheduler: Starting download operation');
 
       await _onSyncRequired();
-      _updateSyncTime();
     } catch (e) {
       Logger.log('SyncScheduler: Error during download: $e');
     } finally {
@@ -169,22 +152,14 @@ class SyncScheduler {
     try {
       _isUploadInProgress = true;
       _isDownloadInProgress = true;
-      Logger.log('SyncScheduler: Starting sync operation');
 
       await _onSyncRequired();
-      _updateSyncTime();
     } catch (e) {
       Logger.log('SyncScheduler: Error during sync: $e');
     } finally {
       _isUploadInProgress = false;
       _isDownloadInProgress = false;
     }
-  }
-
-  void _updateSyncTime() {
-    _lastSyncTime = DateTime.now();
-    Logger.log(
-        'SyncScheduler: Sync completed at ${_lastSyncTime.toIso8601String()}');
   }
 
   /// Disposes of resources used by the scheduler.

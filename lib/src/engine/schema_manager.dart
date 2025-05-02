@@ -315,42 +315,36 @@ class SchemaManager {
   /// This is useful for resetting the sync state on a device or when migrating
   /// from a previous version of the SDK.
   Future<void> reset(Database db) async {
-    Logger.log('SchemaManager: Starting complete PocketSync reset');
-    
+    // TODO: This should take the plugin version into account to
+    // it's run only once per plugin version.
+
     try {
-      // 1. Disable all triggers first to prevent any new changes during reset
       await disableTriggers(db);
-      Logger.log('SchemaManager: Disabled all triggers');
-      
-      // 2. Drop all PocketSync tables (both current and previous versions)
+
       await db.transaction((txn) async {
         // Current version tables
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_device_state');
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_changes');
-        
+
         // Previous version tables
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_version');
-        await txn.execute('DROP TABLE IF EXISTS __pocketsync_processed_changes');
-        
-        Logger.log('SchemaManager: Dropped all PocketSync tables');
+        await txn
+            .execute('DROP TABLE IF EXISTS __pocketsync_processed_changes');
       });
-      
+
       // 3. Recreate the necessary tables
       await initializePocketSyncTables(db);
-      Logger.log('SchemaManager: Recreated PocketSync tables');
-      
+
       // 4. Re-enable change tracking
       await setupChangeTracking(db);
-      Logger.log('SchemaManager: Re-enabled change tracking');
-      
-      Logger.log('SchemaManager: PocketSync reset completed successfully');
     } catch (e) {
       Logger.log('SchemaManager: Error during reset: $e');
       // Try to re-enable change tracking even if there was an error
       try {
         await setupChangeTracking(db);
       } catch (triggerError) {
-        Logger.log('SchemaManager: Error re-enabling triggers after reset failure: $triggerError');
+        Logger.log(
+            'SchemaManager: Error re-enabling triggers after reset failure: $triggerError');
       }
       rethrow;
     }

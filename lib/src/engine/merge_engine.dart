@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
-import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 class MergeEngine {
   final ConflictResolutionStrategy strategy;
@@ -80,8 +79,6 @@ class MergeEngine {
             break;
         }
 
-        Logger.log(
-            'Resolved conflict for ${entry.key} using strategy $strategy');
         mergedChanges.add(winningChange);
       }
     }
@@ -94,9 +91,6 @@ class MergeEngine {
     List<SyncChange> localChanges,
     List<SyncChange> remoteChanges,
   ) async {
-    Logger.log(
-        'Merging ${localChanges.length} local changes with ${remoteChanges.length} remote changes');
-
     final resolvedChanges = await resolveConflicts(localChanges, remoteChanges);
 
     return resolvedChanges;

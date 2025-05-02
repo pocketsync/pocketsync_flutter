@@ -1,3 +1,4 @@
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_engine.dart';
@@ -23,7 +24,7 @@ class PocketSync {
   /// Returns the database instance.
   PocketSyncDatabase get database => _instance._database;
 
-
+  static final DatabaseWatcher _databaseWatcher = DatabaseWatcher();
   static final SchemaManager _schemaManager = SchemaManager();
   final PocketSyncDatabase _database = PocketSyncDatabase(
     schemaManager: _schemaManager,
@@ -40,16 +41,16 @@ class PocketSync {
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
   }) async {
-    final DatabaseWatcher databaseWatcher = DatabaseWatcher();
-    _instance._engine = PocketSyncEngine(
-      _instance._database,
-      options: options,
-      schemaManager: _schemaManager,
-      databaseWatcher: databaseWatcher,
-    );
     await _instance._database.initialize(
       databaseOptions,
-      databaseWatcher,
+      _databaseWatcher,
+    );
+    _instance._engine = PocketSyncEngine(
+      _instance._database.database,
+      options: options,
+      schemaManager: _schemaManager,
+      databaseWatcher: _databaseWatcher,
+      deviceInfo: DeviceInfoPlugin(),
     );
 
     _instance._initialized = true;
@@ -81,7 +82,6 @@ class PocketSync {
   /// This method must be called to reset the engine.
   /// Be cautious when using this method as it will clear all change tracking data.
   Future<void> reset() async {
-    // TODO: Implement reset logic
     _instance._engine.reset();
   }
 

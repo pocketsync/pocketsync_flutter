@@ -124,7 +124,7 @@ class SyncChangeBatch {
   final String deviceId;
 
   /// The user ID associated with these changes
-  final String? userId;
+  final String userId;
 
   /// The list of changes in this batch
   final List<SyncChange> changes;
@@ -132,7 +132,7 @@ class SyncChangeBatch {
   /// Creates a new SyncChangeBatch.
   SyncChangeBatch({
     required this.deviceId,
-    this.userId,
+    required this.userId,
     required this.changes,
   });
 
@@ -143,7 +143,7 @@ class SyncChangeBatch {
   Map<String, dynamic> toTransmissionFormat() {
     return {
       'device_id': deviceId,
-      if (userId != null) 'user_id': userId,
+      'user_id': userId,
       'changes':
           changes.map((change) => change.toTransmissionFormat()).toList(),
       'batch_timestamp': DateTime.now().millisecondsSinceEpoch,

@@ -3,15 +3,10 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
-import 'package:sqflite/sqflite.dart';
-
 class DeviceFingerprintProvider {
   const DeviceFingerprintProvider();
 
-  Future<String> getDeviceFingerprint(
-    Database database,
-    DeviceInfoPlugin deviceInfo,
-  ) async {
+  Future<String> getDeviceFingerprint(DeviceInfoPlugin deviceInfo) async {
     final fingerprintData = <String>[];
 
     if (Platform.isAndroid) {

@@ -2,7 +2,6 @@ import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/listeners/change_listener.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
-import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 /// Listens for database changes and schedules sync operations accordingly.
 ///
@@ -62,7 +61,6 @@ class DatabaseChangeListener extends ChangeListener {
   ///
   /// This method forwards the change to the sync scheduler.
   void _onDatabaseChange(String tableName, ChangeType changeType) {
-    Logger.log('DatabaseChangeListener: Change detected in $tableName (${changeType.name})');
     _syncScheduler.scheduleUpload(tableName, changeType);
   }
 

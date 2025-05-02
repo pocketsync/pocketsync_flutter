@@ -11,7 +11,7 @@ import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/engine/sync_worker.dart';
-import 'package:pocketsync_flutter/src/utils/logger.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Coordinates the overall synchronization process.
 ///
@@ -19,11 +19,12 @@ import 'package:pocketsync_flutter/src/utils/logger.dart';
 /// all the components together and managing the flow of data between them.
 class PocketSyncEngine {
   final PocketSyncOptions options;
-  final PocketSyncDatabase database;
+  final Database database;
   final SchemaManager schemaManager;
   final PocketSyncNetworkClient _apiClient;
   final DeviceFingerprintProvider _deviceFingerprintProvider;
   final DatabaseWatcher databaseWatcher;
+  final DeviceInfoPlugin deviceInfo;
 
   late final SyncQueue _syncQueue;
   late final ChangeAggregator _changeAggregator;
@@ -40,6 +41,7 @@ class PocketSyncEngine {
     required this.options,
     required this.schemaManager,
     required this.databaseWatcher,
+    required this.deviceInfo,
     PocketSyncNetworkClient? apiClient,
     DeviceFingerprintProvider? deviceFingerprintProvider,
     MergeEngine? mergeEngine,
@@ -60,13 +62,8 @@ class PocketSyncEngine {
   Future<void> bootstrap() async {
     if (_isInitialized) return;
 
-    Logger.log('PocketSyncEngine: Bootstrapping sync engine');
-
     final deviceFingerprint =
-        await _deviceFingerprintProvider.getDeviceFingerprint(
-      database.database,
-      DeviceInfoPlugin(),
-    );
+        await _deviceFingerprintProvider.getDeviceFingerprint(deviceInfo);
 
     await schemaManager.registerDevice(database.database, deviceFingerprint);
 
@@ -77,7 +74,7 @@ class PocketSyncEngine {
     _syncQueue = SyncQueue();
 
     _changeAggregator = ChangeAggregator(
-      database: database.database,
+      database: database,
     );
 
     _syncScheduler = SyncScheduler(
@@ -99,8 +96,9 @@ class PocketSyncEngine {
       syncQueue: _syncQueue,
       changeAggregator: _changeAggregator,
       apiClient: _apiClient,
-      database: database.database,
+      database: database,
       mergeEngine: _mergeEngine,
+      databaseWatcher: databaseWatcher,
       schemaManager: schemaManager,
     );
 
@@ -108,8 +106,11 @@ class PocketSyncEngine {
     _databaseChangeListener.startListening();
     _remoteChangeListener.startListening();
 
+    // This will try to download any changes that may have been missed
+    _syncQueue.addRemoteChange();
+    _syncWorker.processQueue();
+
     _isInitialized = true;
-    Logger.log('PocketSyncEngine: Bootstrap complete');
   }
 
   /// Sets the user ID for synchronization.
@@ -124,7 +125,6 @@ class PocketSyncEngine {
   /// This method is called by the SyncScheduler when it determines that a sync
   /// should be performed.
   Future<void> _performSync() async {
-    Logger.log('PocketSyncEngine: Performing sync operation');
     await _syncWorker.processQueue();
   }
 
@@ -133,12 +133,8 @@ class PocketSyncEngine {
   /// This method can be called to force a sync operation regardless of the
   /// current sync schedule.
   Future<void> scheduleSync() async {
-    if (!_isInitialized) {
-      Logger.log('PocketSyncEngine: Cannot sync, not initialized');
-      return;
-    }
+    if (!_isInitialized) return;
 
-    Logger.log('PocketSyncEngine: Manual sync requested');
     await _syncScheduler.forceSyncNow();
   }
 
@@ -149,7 +145,6 @@ class PocketSyncEngine {
   Future<void> stop() async {
     if (!_isInitialized) return;
 
-    Logger.log('PocketSyncEngine: Pausing sync operations');
     _databaseChangeListener.stopListening();
     _remoteChangeListener.stopListening();
     await _syncWorker.stop();
@@ -171,17 +166,10 @@ class PocketSyncEngine {
   Future<void> dispose() async {
     if (!_isInitialized) return;
 
-    Logger.log('PocketSyncEngine: Disposing sync components');
     _databaseChangeListener.dispose();
     _remoteChangeListener.dispose();
     await _syncWorker.stop();
     _apiClient.dispose();
     _isInitialized = false;
   }
-
-  /// Checks if the sync engine is currently initialized.
-  bool get isInitialized => _isInitialized;
-
-  /// Gets the current sync queue.
-  SyncQueue get syncQueue => _syncQueue;
 }
