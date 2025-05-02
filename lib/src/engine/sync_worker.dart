@@ -121,18 +121,18 @@ class SyncWorker {
         // Aggregate changes for the table
         final changes = await _changeAggregator.aggregateChanges(table);
 
-        if (changes.isEmpty) {
+        if (changes.changes.isEmpty) {
           continue;
         }
 
         // Send changes to the server
-        final success = await _apiClient.uploadChanges(changes);
+        final success = await _apiClient.uploadChanges(changes.changes);
 
         if (success) {
           // Mark changes as synced in the database
           await _markChangesAsSynced(
             table,
-            changes.map((c) => c.id).toList(),
+            changes.affectedChangeIds,
           );
 
           // Mark changes as processed in the queue

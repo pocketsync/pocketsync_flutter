@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pocketsync_flutter/src/models/aggregated_changes.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
@@ -22,9 +23,9 @@ class ChangeAggregator {
   /// This method retrieves all pending changes for the specified table from the
   /// database and optimizes them for transmission. It combines related changes
   /// and collapses multiple changes to the same record when possible.
-  /// 
+  ///
   /// Returns a list of [SyncChange] objects ready for transmission to the server.
-  Future<List<SyncChange>> aggregateChanges(String tableName) async {
+  Future<AggregatedChanges> aggregateChanges(String tableName) async {
     final rawChanges = await _database.query(
       '__pocketsync_changes',
       where: 'table_name = ? AND synced = 0',
@@ -33,7 +34,7 @@ class ChangeAggregator {
     );
 
     if (rawChanges.isEmpty) {
-      return [];
+      return AggregatedChanges(changes: [], affectedChangeIds: []);
     }
 
     // Group changes by record ID
@@ -44,26 +45,30 @@ class ChangeAggregator {
       changesByRecord.putIfAbsent(recordId, () => []).add(change);
     }
 
-    // Process each record's changes to optimize
-    final optimizedChanges = <Map<String, dynamic>>[];
+    final aggregatedChanges = AggregatedChanges(
+      changes: [],
+      affectedChangeIds: rawChanges.map((c) => c['id'] as int).toList(),
+    );
 
     for (final recordId in changesByRecord.keys) {
       final recordChanges = changesByRecord[recordId]!;
 
       // If there's only one change for this record, add it directly
       if (recordChanges.length == 1) {
-        optimizedChanges.add(recordChanges.first);
+        aggregatedChanges.changes
+            .add(SyncChange.fromDatabaseRecord(recordChanges.first));
         continue;
       }
 
       // Multiple changes for the same record - optimize
       final optimizedChange = _optimizeChangesForRecord(recordChanges);
       if (optimizedChange != null) {
-        optimizedChanges.add(optimizedChange);
+        aggregatedChanges.changes
+            .add(SyncChange.fromDatabaseRecord(optimizedChange));
       }
     }
-    
-    return SyncChange.fromDatabaseRecords(optimizedChanges);
+
+    return aggregatedChanges;
   }
 
   /// Optimizes multiple changes for a single record.
