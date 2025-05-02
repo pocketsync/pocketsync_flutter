@@ -68,7 +68,6 @@ class PocketSyncEngine {
     await schemaManager.registerDevice(database.database, deviceFingerprint);
 
     _apiClient.setupClient(options, deviceFingerprint);
-    _apiClient.listenForRemoteChanges();
 
     // Initialize components
     _syncQueue = SyncQueue();
@@ -105,6 +104,10 @@ class PocketSyncEngine {
     // Start listening for database changes
     _databaseChangeListener.startListening();
     _remoteChangeListener.startListening();
+
+    _apiClient.listenForRemoteChanges(
+      since: await _syncWorker.getLastDownloadTimestamp(),
+    );
 
     _isInitialized = true;
   }
