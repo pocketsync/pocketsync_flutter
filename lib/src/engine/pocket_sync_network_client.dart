@@ -91,7 +91,6 @@ class PocketSyncNetworkClient {
       _socket!.on('sync-changes', (data) {
         try {
           final notification = SyncNotification.fromJson(data);
-          Logger.log('New changes available: $notification');
           _notificationController!.add(notification);
         } catch (e) {
           Logger.log('Error parsing sync notification: $e');
@@ -122,8 +121,6 @@ class PocketSyncNetworkClient {
       // Convert the batch to JSON
       final payload = batch.toJson();
 
-      Logger.log('Uploading ${changes.length} changes');
-
       final dio = Dio();
       final response = await dio.post(
         '$_baseUrl/sync/upload',
@@ -132,14 +129,12 @@ class PocketSyncNetworkClient {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Logger.log('Successfully uploaded ${changes.length} changes');
+        Logger.log('Uploaded ${changes.length} changes');
         return true;
       } else {
-        Logger.log('Failed to upload changes. Status: ${response.statusCode}');
         return false;
       }
-    } on DioException catch (e) {
-      Logger.log('Error uploading changes: ${e.response?.data}');
+    } on DioException catch (_) {
       return false;
     }
   }
@@ -164,8 +159,6 @@ class PocketSyncNetworkClient {
 
       final sinceTimestamp = timestamp.millisecondsSinceEpoch;
 
-      Logger.log('Downloading changes since ${timestamp.toIso8601String()}');
-
       final dio = Dio();
       final response = await dio.get(
         '$_baseUrl/sync/download',
@@ -176,17 +169,13 @@ class PocketSyncNetworkClient {
       if (response.statusCode == 200) {
         return ChangesResponse.fromJson(response.data);
       } else {
-        Logger.log(
-          'Failed to download changes. Status: ${response.statusCode}',
-        );
         return ChangesResponse(
           count: 0,
           timestamp: DateTime.now(),
           changes: [],
         );
       }
-    } on DioException catch (e) {
-      Logger.log('Error downloading changes: ${e.response?.data}');
+    } on DioException catch (_) {
       return ChangesResponse(
         count: 0,
         timestamp: DateTime.now(),

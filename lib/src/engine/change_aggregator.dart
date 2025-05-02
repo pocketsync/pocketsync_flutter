@@ -47,7 +47,7 @@ class ChangeAggregator {
 
     final aggregatedChanges = AggregatedChanges(
       changes: [],
-      affectedChangeIds: rawChanges.map((c) => c['id'] as int).toList(),
+      affectedChangeIds: rawChanges.map((c) => c['id'] as String).toList(),
     );
 
     for (final recordId in changesByRecord.keys) {

@@ -7,6 +7,7 @@ import 'package:pocketsync_flutter/src/models/sync_notification.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 class RemoteChangeListener extends ChangeListener {
+  final DateTime since;
   final SyncScheduler _syncScheduler;
   final PocketSyncNetworkClient _apiClient;
   StreamSubscription<SyncNotification>? _subscription;
@@ -14,18 +15,20 @@ class RemoteChangeListener extends ChangeListener {
   RemoteChangeListener({
     required SyncScheduler syncScheduler,
     required PocketSyncNetworkClient apiClient,
+    required this.since,
   })  : _syncScheduler = syncScheduler,
         _apiClient = apiClient;
 
   @override
   void startListening() {
-    final notificationStream = _apiClient.listenForRemoteChanges();
+    final notificationStream = _apiClient.listenForRemoteChanges(since: since);
     _subscription = notificationStream.listen(_onRemoteChange);
     Logger.log('RemoteChangeListener: Started listening for remote changes');
   }
-  
+
   void _onRemoteChange(SyncNotification notification) {
-    Logger.log('RemoteChangeListener: Received notification - ${notification.changeCount} changes from device ${notification.sourceDeviceId}');
+    Logger.log(
+        'RemoteChangeListener: Received notification - ${notification.changeCount} changes from device ${notification.sourceDeviceId}');
     _syncScheduler.scheduleDownload();
   }
 

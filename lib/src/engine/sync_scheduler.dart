@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
+import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 
 /// Manages the timing and scheduling of synchronization operations.
 ///
@@ -39,7 +40,7 @@ class SyncScheduler {
     Duration? debounceInterval,
   })  : _syncQueue = syncQueue,
         _onSyncRequired = onSyncRequired,
-        _debounceInterval = debounceInterval ?? const Duration(seconds: 5);
+        _debounceInterval = debounceInterval ?? SyncConfig.defaultDebounceInterval;
 
   /// Schedules a sync operation based on a database change.
   void scheduleUpload(String tableName, ChangeType changeType) {

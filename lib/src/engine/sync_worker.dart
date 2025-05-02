@@ -196,7 +196,8 @@ class SyncWorker {
       // This is necessary because the engine internally does not use the database wrapper
       // and does not notify listeners about changes.
       for (final table in _getTables(remoteChanges)) {
-        _databaseWatcher.notifyListeners(table, ChangeType.update);
+        _databaseWatcher.notifyListeners(table, ChangeType.update,
+            triggerSync: false);
       }
     } catch (e) {
       Logger.log('SyncWorker: Error processing downloads: $e');
@@ -220,30 +221,33 @@ class SyncWorker {
 
     try {
       switch (change.operation) {
-        case ChangeType.insert:
-          // Insert new record
-          await _database.insert(tableName, data);
-          break;
+        case ChangeType.insert || ChangeType.update:
+          // Insert or update record
+          final newData = Map<String, dynamic>.from(data['new']);
+          if (newData.isEmpty) {
+            return;
+          }
 
-        case ChangeType.update:
-          // Update existing record
-          await _database.update(
-            tableName,
-            data,
-            where: 'id = ?',
-            whereArgs: [recordId],
+          final columns = newData.keys.join(', ');
+          final placeholders = List.filled(newData.length, '?').join(', ');
+          final values = newData.values.toList();
+
+          await _database.rawInsert(
+            'INSERT OR REPLACE INTO $tableName ($columns) VALUES ($placeholders)',
+            values,
           );
           break;
 
         case ChangeType.delete:
           // Delete record
-          await _database.delete(
-            tableName,
-            where: 'id = ?',
-            whereArgs: [recordId],
+          await _database.rawDelete(
+            'DELETE FROM $tableName WHERE ps_global_id = ?',
+            [recordId],
           );
           break;
       }
+    } catch (e) {
+      Logger.log('SyncWorker: Error applying change: $e');
     } finally {
       await _schemaManager.setupChangeTracking(_database);
     }
@@ -289,7 +293,7 @@ class SyncWorker {
   /// This method updates the __pocketsync_changes table to mark the specified
   /// changes as synced.
   Future<void> _markChangesAsSynced(
-      String tableName, List<int> changeIds) async {
+      String tableName, List<String> changeIds) async {
     if (changeIds.isEmpty) return;
 
     // Update the changes table to mark these changes as synced
@@ -308,13 +312,14 @@ class SyncWorker {
   Future<DateTime> getLastDownloadTimestamp() async {
     final rows = await _database.query(
       '__pocketsync_device_state',
-      where: 'device_id = ?',
+      columns: ['last_download_timestamp'],
+      limit: 1,
     );
     if (rows.isEmpty) {
       return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     }
     return DateTime.fromMillisecondsSinceEpoch(
-      rows[0]['last_download_timestamp'] as int,
+      rows[0]['last_download_timestamp'] as int? ?? 0,
       isUtc: true,
     );
   }

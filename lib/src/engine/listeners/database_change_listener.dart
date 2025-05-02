@@ -60,21 +60,25 @@ class DatabaseChangeListener extends ChangeListener {
   /// Callback that's invoked when a database change is detected.
   ///
   /// This method forwards the change to the sync scheduler.
-  void _onDatabaseChange(String tableName, ChangeType changeType) {
-    _syncScheduler.scheduleUpload(tableName, changeType);
-  }
+
 
   /// Manually triggers a database change notification.
   ///
   /// This is useful for testing or for triggering sync operations
   /// from non-database sources.
-  void notifyChange(String tableName, ChangeType changeType) {
-    _onDatabaseChange(tableName, changeType);
+  void notifyChange(String tableName, ChangeType changeType, {bool triggerSync = true}) {
+    _onDatabaseChange(tableName, changeType, triggerSync);
   }
 
   /// Disposes of resources used by this listener.
   @override
   void dispose() {
     stopListening();
+  }
+
+  void _onDatabaseChange(String tableName, ChangeType changeType, bool triggerSync) {
+    if (triggerSync) {
+      _syncScheduler.scheduleUpload(tableName, changeType);
+    }
   }
 }

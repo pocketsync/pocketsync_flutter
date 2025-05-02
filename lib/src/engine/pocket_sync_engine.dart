@@ -25,14 +25,14 @@ class PocketSyncEngine {
   final DeviceFingerprintProvider _deviceFingerprintProvider;
   final DatabaseWatcher databaseWatcher;
   final DeviceInfoPlugin deviceInfo;
+  final MergeEngine _mergeEngine;
 
-  late final SyncQueue _syncQueue;
-  late final ChangeAggregator _changeAggregator;
-  late final DatabaseChangeListener _databaseChangeListener;
-  late final RemoteChangeListener _remoteChangeListener;
-  late final SyncScheduler _syncScheduler;
-  late final SyncWorker _syncWorker;
-  late final MergeEngine _mergeEngine;
+  late SyncQueue _syncQueue;
+  late ChangeAggregator _changeAggregator;
+  late DatabaseChangeListener _databaseChangeListener;
+  late RemoteChangeListener _remoteChangeListener;
+  late SyncScheduler _syncScheduler;
+  late SyncWorker _syncWorker;
 
   bool _isInitialized = false;
 
@@ -86,11 +86,6 @@ class PocketSyncEngine {
       databaseWatcher: databaseWatcher,
     );
 
-    _remoteChangeListener = RemoteChangeListener(
-      syncScheduler: _syncScheduler,
-      apiClient: _apiClient,
-    );
-
     _syncWorker = SyncWorker(
       syncQueue: _syncQueue,
       changeAggregator: _changeAggregator,
@@ -101,13 +96,15 @@ class PocketSyncEngine {
       schemaManager: schemaManager,
     );
 
+    _remoteChangeListener = RemoteChangeListener(
+      syncScheduler: _syncScheduler,
+      apiClient: _apiClient,
+      since: await _syncWorker.getLastDownloadTimestamp(),
+    );
+
     // Start listening for database changes
     _databaseChangeListener.startListening();
     _remoteChangeListener.startListening();
-
-    _apiClient.listenForRemoteChanges(
-      since: await _syncWorker.getLastDownloadTimestamp(),
-    );
 
     _isInitialized = true;
   }
@@ -147,6 +144,8 @@ class PocketSyncEngine {
     _databaseChangeListener.stopListening();
     _remoteChangeListener.stopListening();
     await _syncWorker.stop();
+
+    _isInitialized = false;
   }
 
   /// Resets the PocketSync engine.

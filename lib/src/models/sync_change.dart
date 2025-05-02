@@ -110,16 +110,16 @@ class SyncChange {
 
   factory SyncChange.fromJson(Map<String, dynamic> json) {
     return SyncChange(
-      id: json['id'] as String,
+      id: json['change_id'] as String,
       tableName: json['table_name'] as String,
       recordId: json['record_id'] as String,
       operation: ChangeType.values.firstWhere(
-        (op) => op.name.toUpperCase() == json['operation'] as String,
-        orElse: () => ChangeType.update,
+        (op) => op.name.toLowerCase() == json['operation'].toLowerCase(),
+        orElse: () => ChangeType.insert,
       ),
       timestamp: json['timestamp'] as int,
       version: json['version'] as int,
-      synced: (json['synced'] as int) == 1,
+      synced: (json['synced'] as int?) == 1,
       data: json['data'] as Map<String, dynamic>,
     );
   }
