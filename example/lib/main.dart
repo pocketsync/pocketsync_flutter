@@ -9,11 +9,6 @@ void main() async {
 
   String path = join(await getDatabasesPath(), 'todo_database.db');
 
-  const projectId = String.fromEnvironment('PS_PROJECT_ID');
-  const authToken = String.fromEnvironment('PS_AUTH_TOKEN');
-  const serverUrl = String.fromEnvironment('PS_SERVER_URL',
-      defaultValue: 'https://api.pocketsync.dev');
-
   await PocketSync.initialize(
     options: PocketSyncOptions(
       projectId: '1d0c9a33-e5bd-4149-9971-8b2568f22469',
