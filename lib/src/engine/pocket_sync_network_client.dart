@@ -13,7 +13,6 @@ class PocketSyncNetworkClient {
 
   String? _deviceId;
   String? _userId;
-  DateTime? _lastFetchedTimestamp;
 
   PocketSyncNetworkClient({
     required String baseUrl,
@@ -161,9 +160,7 @@ class PocketSyncNetworkClient {
 
     try {
       // Use provided timestamp or the last one we stored
-      final timestamp = since ??
-          _lastFetchedTimestamp ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+      final timestamp = since ?? DateTime.fromMillisecondsSinceEpoch(0);
 
       final sinceTimestamp = timestamp.millisecondsSinceEpoch;
 

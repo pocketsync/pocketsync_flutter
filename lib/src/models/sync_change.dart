@@ -9,7 +9,7 @@ import 'package:pocketsync_flutter/src/utils/logger.dart';
 /// transmitted to the server during synchronization.
 class SyncChange {
   /// Unique identifier for the change
-  final int id;
+  final String id;
 
   /// The table that was changed
   final String tableName;
@@ -71,7 +71,7 @@ class SyncChange {
     }
 
     return SyncChange(
-      id: record['id'] as int,
+      id: record['id'] as String,
       tableName: record['table_name'] as String,
       recordId: record['record_rowid'] as String,
       operation: operation,
@@ -110,7 +110,7 @@ class SyncChange {
 
   factory SyncChange.fromJson(Map<String, dynamic> json) {
     return SyncChange(
-      id: json['change_id'] as int,
+      id: json['id'] as String,
       tableName: json['table_name'] as String,
       recordId: json['record_id'] as String,
       operation: ChangeType.values.firstWhere(

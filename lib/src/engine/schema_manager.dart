@@ -56,7 +56,7 @@ class SchemaManager {
       // Create changes tracking table
       await txn.execute('''
         CREATE TABLE IF NOT EXISTS __pocketsync_changes (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id TEXT PRIMARY KEY,
           table_name TEXT NOT NULL,
           record_rowid TEXT NOT NULL,
           operation TEXT NOT NULL,
@@ -123,9 +123,10 @@ class SchemaManager {
         -- Now fetch the complete record with guaranteed ps_global_id for the change log
         -- Get the latest version number from existing changes
         INSERT INTO __pocketsync_changes (
-          table_name, record_rowid, operation, timestamp, data, version
+          id, table_name, record_rowid, operation, timestamp, data, version
         )
         SELECT 
+          hex(randomblob(16)),
           '$tableName',
           T.ps_global_id,
           'UPDATE',
@@ -152,9 +153,10 @@ class SchemaManager {
         
         -- Use a subquery to get the complete record with the updated ps_global_id
         INSERT INTO __pocketsync_changes (
-          table_name, record_rowid, operation, timestamp, data, version
+          id, table_name, record_rowid, operation, timestamp, data, version
         )
         SELECT 
+          hex(randomblob(16)),
           '$tableName',
           T.ps_global_id,
           'INSERT',
@@ -176,8 +178,9 @@ class SchemaManager {
         -- For DELETE operations, we need to ensure we have a valid global ID
         -- even though the record is being deleted
         INSERT INTO __pocketsync_changes (
-          table_name, record_rowid, operation, timestamp, data, version
+          id, table_name, record_rowid, operation, timestamp, data, version
         ) VALUES (
+          hex(randomblob(16)),
           '$tableName',
           COALESCE(OLD.ps_global_id, hex(randomblob(16))),
           'DELETE',
