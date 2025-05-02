@@ -40,7 +40,8 @@ class SyncScheduler {
     Duration? debounceInterval,
   })  : _syncQueue = syncQueue,
         _onSyncRequired = onSyncRequired,
-        _debounceInterval = debounceInterval ?? SyncConfig.defaultDebounceInterval;
+        _debounceInterval =
+            debounceInterval ?? SyncConfig.defaultDebounceInterval;
 
   /// Schedules a sync operation based on a database change.
   void scheduleUpload(String tableName, ChangeType changeType) {

@@ -7,13 +7,13 @@ import 'package:pocketsync_flutter/src/utils/logger.dart';
 class SyncNotification {
   /// The type of notification
   final String type;
-  
+
   /// The ID of the device that originated the changes
   final String sourceDeviceId;
-  
+
   /// The number of changes in this notification
   final int changeCount;
-  
+
   /// The timestamp of the notification (milliseconds since epoch)
   final int timestamp;
 

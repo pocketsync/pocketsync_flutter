@@ -29,7 +29,8 @@ class PocketSyncDatabase extends DatabaseExecutor {
   ///
   /// [options] The configuration options for the database.
   /// [databaseWatcher] The database watcher to be used for change notifications.
-  Future<void> initialize(DatabaseOptions options, DatabaseWatcher databaseWatcher) async {
+  Future<void> initialize(
+      DatabaseOptions options, DatabaseWatcher databaseWatcher) async {
     _db = await databaseFactory.openDatabase(
       options.dbPath,
       options: OpenDatabaseOptions(

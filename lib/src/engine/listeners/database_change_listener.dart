@@ -30,7 +30,7 @@ class DatabaseChangeListener extends ChangeListener {
   @override
   void startListening() {
     if (_isListening) return;
-    
+
     _databaseWatcher.setGlobalCallback(_onDatabaseChange);
     _isListening = true;
   }
@@ -39,7 +39,7 @@ class DatabaseChangeListener extends ChangeListener {
   @override
   void stopListening() {
     if (!_isListening) return;
-    
+
     _databaseWatcher.setGlobalCallback(null);
     _isListening = false;
   }
@@ -61,12 +61,12 @@ class DatabaseChangeListener extends ChangeListener {
   ///
   /// This method forwards the change to the sync scheduler.
 
-
   /// Manually triggers a database change notification.
   ///
   /// This is useful for testing or for triggering sync operations
   /// from non-database sources.
-  void notifyChange(String tableName, ChangeType changeType, {bool triggerSync = true}) {
+  void notifyChange(String tableName, ChangeType changeType,
+      {bool triggerSync = true}) {
     _onDatabaseChange(tableName, changeType, triggerSync);
   }
 
@@ -76,7 +76,8 @@ class DatabaseChangeListener extends ChangeListener {
     stopListening();
   }
 
-  void _onDatabaseChange(String tableName, ChangeType changeType, bool triggerSync) {
+  void _onDatabaseChange(
+      String tableName, ChangeType changeType, bool triggerSync) {
     if (triggerSync) {
       _syncScheduler.scheduleUpload(tableName, changeType);
     }

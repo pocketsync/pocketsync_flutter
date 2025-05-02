@@ -24,7 +24,8 @@ class DatabaseWatcher {
     _tableChangeCallbacks.remove(tableName);
   }
 
-  void notifyListeners(String tableName, ChangeType changeType, {bool triggerSync = true}) {
+  void notifyListeners(String tableName, ChangeType changeType,
+      {bool triggerSync = true}) {
     final callback = _tableChangeCallbacks[tableName];
     if (callback != null) {
       callback(tableName, changeType);

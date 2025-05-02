@@ -37,7 +37,8 @@ class PocketSyncBatch implements Batch {
       conflictAlgorithm: conflictAlgorithm,
     );
 
-    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.insert));
+    _mutations
+        .add(DatabaseMutation(tableName: table, changeType: ChangeType.insert));
   }
 
   @override
@@ -45,13 +46,15 @@ class PocketSyncBatch implements Batch {
     _batch.rawInsert(sql, arguments);
 
     final tables = extractAffectedTables(sql);
-    _mutations.addAll(tables.map((table) => DatabaseMutation(tableName: table, changeType: ChangeType.insert)));
+    _mutations.addAll(tables.map((table) =>
+        DatabaseMutation(tableName: table, changeType: ChangeType.insert)));
   }
 
   @override
   void delete(String table, {String? where, List<Object?>? whereArgs}) {
     _batch.delete(table, where: where, whereArgs: whereArgs);
-    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.delete));
+    _mutations
+        .add(DatabaseMutation(tableName: table, changeType: ChangeType.delete));
   }
 
   @override
@@ -105,7 +108,8 @@ class PocketSyncBatch implements Batch {
       conflictAlgorithm: conflictAlgorithm,
     );
 
-    _mutations.add(DatabaseMutation(tableName: table, changeType: ChangeType.update));
+    _mutations
+        .add(DatabaseMutation(tableName: table, changeType: ChangeType.update));
   }
 
   @override
