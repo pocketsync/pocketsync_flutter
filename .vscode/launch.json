@@ -27,7 +27,7 @@
             "request": "launch",
             "type": "dart",
             "args": [
-                "--dart-define-from-file=dart-defines.json"
+                "--dart-define-from-file=example/dart-defines.json"
             ]
         },
         {
@@ -37,7 +37,7 @@
             "type": "dart",
             "flutterMode": "profile",
             "args": [
-                "--dart-define-from-file=dart-defines.json"
+                "--dart-define-from-file=example/dart-defines.json"
             ]
         },
         {
@@ -45,7 +45,10 @@
             "cwd": "example",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release"
+            "flutterMode": "release",
+            "args": [
+                "--dart-define-from-file=example/dart-defines.json"
+            ]
         }
     ]
 }

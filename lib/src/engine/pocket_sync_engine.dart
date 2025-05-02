@@ -106,10 +106,6 @@ class PocketSyncEngine {
     _databaseChangeListener.startListening();
     _remoteChangeListener.startListening();
 
-    // This will try to download any changes that may have been missed
-    _syncQueue.addRemoteChange();
-    _syncWorker.processQueue();
-
     _isInitialized = true;
   }
 

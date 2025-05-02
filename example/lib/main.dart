@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:path/path.dart';
@@ -15,12 +16,11 @@ void main() async {
 
   await PocketSync.initialize(
     options: PocketSyncOptions(
-      projectId: projectId,
-      authToken: authToken,
-      serverUrl: serverUrl,
-      // serverUrl: defaultTargetPlatform == TargetPlatform.android
-      //     ? 'http://10.0.2.2:3000'
-      //     : 'http://127.0.0.1:3000',
+      projectId: '1d0c9a33-e5bd-4149-9971-8b2568f22469',
+      authToken: 'ds_NzhkNzk3ZWE1NGE1NDA1NDk0ZGU5ODAxZDBkZjQ4MmY=',
+      serverUrl: defaultTargetPlatform == TargetPlatform.android
+          ? 'http://10.0.2.2:3000'
+          : 'http://127.0.0.1:3000',
     ),
     databaseOptions: DatabaseOptions(
       dbPath: path,

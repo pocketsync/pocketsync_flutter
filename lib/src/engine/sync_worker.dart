@@ -158,8 +158,8 @@ class SyncWorker {
 
       final downloadedChanges = await _apiClient.downloadChanges(since: since);
 
-      if (downloadedChanges.isNotEmpty) {
-        _syncQueue.addRemoteChanges(downloadedChanges);
+      if (downloadedChanges.changes.isNotEmpty) {
+        _syncQueue.addRemoteChanges(downloadedChanges.changes);
       }
 
       final remoteChanges = _syncQueue.getRemoteChanges();

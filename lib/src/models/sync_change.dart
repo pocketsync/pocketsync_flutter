@@ -108,6 +108,22 @@ class SyncChange {
         .toList();
   }
 
+  factory SyncChange.fromJson(Map<String, dynamic> json) {
+    return SyncChange(
+      id: json['change_id'] as int,
+      tableName: json['table_name'] as String,
+      recordId: json['record_id'] as String,
+      operation: ChangeType.values.firstWhere(
+        (op) => op.name.toUpperCase() == json['operation'] as String,
+        orElse: () => ChangeType.update,
+      ),
+      timestamp: json['timestamp'] as int,
+      version: json['version'] as int,
+      synced: (json['synced'] as int) == 1,
+      data: json['data'] as Map<String, dynamic>,
+    );
+  }
+
   @override
   String toString() {
     return 'SyncChange{id: $id, tableName: $tableName, recordId: $recordId, '
@@ -120,19 +136,11 @@ class SyncChange {
 /// This class groups multiple SyncChange objects together for efficient
 /// transmission to the server.
 class SyncChangeBatch {
-  /// The device ID that generated these changes
-  final String deviceId;
-
-  /// The user ID associated with these changes
-  final String userId;
-
   /// The list of changes in this batch
   final List<SyncChange> changes;
 
   /// Creates a new SyncChangeBatch.
   SyncChangeBatch({
-    required this.deviceId,
-    required this.userId,
     required this.changes,
   });
 
@@ -142,8 +150,6 @@ class SyncChangeBatch {
   /// to the server.
   Map<String, dynamic> toTransmissionFormat() {
     return {
-      'device_id': deviceId,
-      'user_id': userId,
       'changes':
           changes.map((change) => change.toTransmissionFormat()).toList(),
       'batch_timestamp': DateTime.now().millisecondsSinceEpoch,

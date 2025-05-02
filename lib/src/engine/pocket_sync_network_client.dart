@@ -1,8 +1,12 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
+import 'package:pocketsync_flutter/src/models/changes_response.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
+import 'package:pocketsync_flutter/src/models/sync_notification.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class PocketSyncNetworkClient {
   final String _baseUrl;
@@ -20,13 +24,15 @@ class PocketSyncNetworkClient {
     'Accept': 'application/json',
   };
 
-  StreamSubscription<String>? _remoteChangesSubscription;
+  io.Socket? _socket;
+  StreamController<SyncNotification>? _notificationController;
+  Stream<SyncNotification>? _notificationStream;
 
   void setupClient(PocketSyncOptions options, String deviceId) {
     _deviceId = deviceId;
 
     _headers.addAll({
-      'Authorization': 'Api-Key ${options.authToken}',
+      'Authorization': 'Bearer ${options.authToken}',
       'x-project-id': options.projectId,
       'x-device-id': deviceId,
     });
@@ -37,8 +43,67 @@ class PocketSyncNetworkClient {
     _headers['x-user-id'] = userId;
   }
 
-  void listenForRemoteChanges({void Function()? onRemoteChange}) async {
-    // We will use Socket.io
+  /// Listens for remote changes using Socket.IO.
+  ///
+  /// This method establishes a connection to the server's Socket.IO endpoint
+  /// and listens for change notifications.
+  Stream<SyncNotification> listenForRemoteChanges({DateTime? since}) {
+    if (_notificationStream != null) {
+      return _notificationStream!;
+    }
+
+    _notificationController = StreamController<SyncNotification>.broadcast();
+
+    try {
+      // Initialize Socket.IO client
+      _socket = io.io('$_baseUrl/sync/notifications', <String, dynamic>{
+        'transports': ['websocket'],
+        'autoConnect': true,
+        'reconnection': true,
+        'reconnectionDelay': 1000,
+        'reconnectionDelayMax': 5000,
+        'reconnectionAttempts': 10,
+        'extraHeaders': _headers,
+      });
+
+      // Connect to the server
+      _socket!.connect();
+
+      // Listen for connection events
+      _socket!.onConnect((_) {
+        _socket!.emit('subscribe', {
+          'userId': _userId,
+          'deviceId': _deviceId,
+          'since': since?.millisecondsSinceEpoch,
+        });
+
+        Logger.log('Connected to server');
+      });
+
+      _socket!.onConnectError((error) {
+        Logger.log('Connection error: $error');
+      });
+
+      _socket!.onDisconnect((_) {
+        Logger.log('Disconnected');
+      });
+
+      // Listen for sync notifications
+      _socket!.on('sync-changes', (data) {
+        try {
+          final notification = SyncNotification.fromJson(data);
+          Logger.log('New changes available: $notification');
+          _notificationController!.add(notification);
+        } catch (e) {
+          Logger.log('Error parsing sync notification: $e');
+        }
+      });
+    } catch (e) {
+      Logger.log('Error setting up server connection: $e');
+    }
+
+    _notificationStream = _notificationController!.stream;
+    return _notificationStream!;
   }
 
   /// Uploads a list of changes to the server.
@@ -47,35 +112,35 @@ class PocketSyncNetworkClient {
   /// [SyncChangeBatch], and sends them to the server for processing.
   Future<bool> uploadChanges(List<SyncChange> changes) async {
     if (changes.isEmpty || _deviceId == null || _userId == null) {
-      Logger.log('PocketSyncNetworkClient: No changes to upload');
+      Logger.log('No changes to upload');
       return true;
     }
 
     try {
       // Create a batch of changes
-      final batch = SyncChangeBatch(
-        deviceId: _deviceId!,
-        userId: _userId!,
-        changes: changes,
-      );
+      final batch = SyncChangeBatch(changes: changes);
 
       // Convert the batch to JSON
       final payload = batch.toJson();
 
-      // TODO: Implement actual HTTP request to upload changes
-      // For now, just simulate a successful upload
-      Logger.log(
-          'PocketSyncNetworkClient: Uploading ${changes.length} changes');
-      Logger.log(
-          'PocketSyncNetworkClient: Payload size: ${payload.length} bytes');
+      Logger.log('Uploading ${changes.length} changes');
 
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 500));
+      final dio = Dio();
+      final response = await dio.post(
+        '$_baseUrl/sync/upload',
+        data: payload,
+        options: Options(headers: _headers),
+      );
 
-      // Return success
-      return true;
-    } catch (e) {
-      Logger.log('PocketSyncNetworkClient: Error uploading changes: $e');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        Logger.log('Successfully uploaded ${changes.length} changes');
+        return true;
+      } else {
+        Logger.log('Failed to upload changes. Status: ${response.statusCode}');
+        return false;
+      }
+    } on DioException catch (e) {
+      Logger.log('Error uploading changes: ${e.response?.data}');
       return false;
     }
   }
@@ -83,12 +148,15 @@ class PocketSyncNetworkClient {
   /// Downloads changes from the server.
   ///
   /// This method makes a REST call to the server to fetch available changes
-  /// and adds them to the SyncQueue for processing.
-  Future<List<SyncChange>> downloadChanges({DateTime? since}) async {
+  /// and returns them for processing.
+  Future<ChangesResponse> downloadChanges({DateTime? since}) async {
     if (_deviceId == null || _userId == null) {
-      Logger.log(
-          'PocketSyncNetworkClient: Device ID or User ID not set, cannot download changes');
-      return [];
+      Logger.log('Device ID or User ID not set, cannot download changes');
+      return ChangesResponse(
+        count: 0,
+        timestamp: DateTime.now(),
+        changes: [],
+      );
     }
 
     try {
@@ -97,61 +165,51 @@ class PocketSyncNetworkClient {
           _lastFetchedTimestamp ??
           DateTime.fromMillisecondsSinceEpoch(0);
 
-      Logger.log(
-          'PocketSyncNetworkClient: Downloading changes since ${timestamp.toIso8601String()}');
+      final sinceTimestamp = timestamp.millisecondsSinceEpoch;
 
-      // TODO: Implement actual HTTP request to download changes
-      // For now, just simulate a successful download with mock data
+      Logger.log('Downloading changes since ${timestamp.toIso8601String()}');
 
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 500));
+      final dio = Dio();
+      final response = await dio.get(
+        '$_baseUrl/sync/download',
+        queryParameters: {'since': sinceTimestamp},
+        options: Options(headers: _headers),
+      );
 
-      // Create some mock changes for testing
-      final mockChanges = [
-        SyncChange(
-          id: 1001,
-          tableName: 'notes',
-          recordId: 'note123',
-          operation: ChangeType.insert,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          version: 1,
-          data: {
-            'id': 'note123',
-            'title': 'New Note',
-            'content': 'This is a test note'
-          },
-        ),
-        SyncChange(
-          id: 1002,
-          tableName: 'tasks',
-          recordId: 'task456',
-          operation: ChangeType.update,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          version: 2,
-          data: {'id': 'task456', 'title': 'Updated Task', 'completed': true},
-        ),
-      ];
-
-      // Update the last fetched timestamp
-      _lastFetchedTimestamp = DateTime.now();
-
-      Logger.log(
-          'PocketSyncNetworkClient: Downloaded ${mockChanges.length} changes');
-
-      return mockChanges;
-    } catch (e) {
-      Logger.log('PocketSyncNetworkClient: Error downloading changes: $e');
-      return [];
+      if (response.statusCode == 200) {
+        return ChangesResponse.fromJson(response.data);
+      } else {
+        Logger.log(
+          'Failed to download changes. Status: ${response.statusCode}',
+        );
+        return ChangesResponse(
+          count: 0,
+          timestamp: DateTime.now(),
+          changes: [],
+        );
+      }
+    } on DioException catch (e) {
+      Logger.log('Error downloading changes: ${e.response?.data}');
+      return ChangesResponse(
+        count: 0,
+        timestamp: DateTime.now(),
+        changes: [],
+      );
     }
   }
 
+  /// Stops listening for remote changes.
   void stopListening() {
-    _remoteChangesSubscription?.cancel();
-    _remoteChangesSubscription = null;
+    _socket?.disconnect();
+    _notificationController?.close();
+    _notificationController = null;
+    _notificationStream = null;
   }
 
+  /// Disposes of resources.
   void dispose() {
-    _remoteChangesSubscription?.cancel();
-    _remoteChangesSubscription = null;
+    stopListening();
+    _socket?.dispose();
+    _socket = null;
   }
 }
