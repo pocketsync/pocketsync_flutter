@@ -69,6 +69,9 @@ class PocketSyncEngine {
 
     _apiClient.setupClient(options, deviceFingerprint);
 
+    // Process pre-existing data if enabled
+    await schemaManager.syncPreExistingData(database.database, options);
+
     // Initialize components
     _syncQueue = SyncQueue();
 

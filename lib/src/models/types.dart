@@ -50,6 +50,11 @@ class PocketSyncOptions {
   /// Defaults to 30 days.
   final int changeLogRetentionDays;
 
+  /// Whether to sync existing data.
+  ///
+  /// Defaults to `true`.
+  final bool syncExistingData;
+
   /// The conflict resolution strategy.
   ///
   /// Defaults to `lastWriteWins`.
@@ -70,6 +75,7 @@ class PocketSyncOptions {
     required this.authToken,
     required this.serverUrl,
     this.changeLogRetentionDays = 30,
+    this.syncExistingData = true,
     this.conflictResolutionStrategy = ConflictResolutionStrategy.lastWriteWins,
     this.customResolver,
     this.verbose = false,
