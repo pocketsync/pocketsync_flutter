@@ -122,6 +122,8 @@ class PocketSyncEngine {
   /// should be performed.
   Future<void> _performSync() async {
     await _syncWorker.processQueue();
+
+    await schemaManager.cleanupOldSyncRecords(database, options);
   }
 
   /// Manually triggers a sync operation.

@@ -1,5 +1,6 @@
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
+import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SchemaManager {
@@ -80,7 +81,17 @@ class SchemaManager {
           device_id TEXT PRIMARY KEY,
           last_upload_timestamp INTEGER NULL,
           last_download_timestamp INTEGER NULL,
-          last_sync_status TEXT NULL
+          last_sync_status TEXT NULL,
+          last_cleanup_timestamp INTEGER NULL
+        )
+      ''');
+
+      // Create version tracking table
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS __pocketsync_version (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          version TEXT NOT NULL,
+          last_reset_timestamp INTEGER NOT NULL
         )
       ''');
     });
@@ -224,8 +235,21 @@ class SchemaManager {
 
   // Clean up old sync records based on retention policy
   Future<int> cleanupOldSyncRecords(
-      Database db, PocketSyncOptions options) async {
+    Database db,
+    PocketSyncOptions options,
+  ) async {
     try {
+      final deviceState = await db.query('__pocketsync_device_state', limit: 1);
+      
+      if (deviceState.isNotEmpty && deviceState.first['last_cleanup_timestamp'] != null) {
+        final lastCleanupTimestamp = deviceState.first['last_cleanup_timestamp'] as int;
+        final currentTime = DateTime.now().millisecondsSinceEpoch;
+        
+        if (currentTime - lastCleanupTimestamp < const Duration(hours: 24).inMilliseconds) {
+          return 0;
+        }
+      }
+      
       final retentionDays = options.changeLogRetentionDays;
 
       // Calculate cutoff timestamp
@@ -234,8 +258,17 @@ class SchemaManager {
           .millisecondsSinceEpoch;
 
       // Delete old sync records that have been synced
-      return await db.delete('__pocketsync_changes',
+      final deletedCount = await db.delete('__pocketsync_changes',
           where: 'synced = 1 AND timestamp < ?', whereArgs: [cutoffTimestamp]);
+      
+      // Update the last cleanup timestamp
+      final currentTime = DateTime.now().millisecondsSinceEpoch;
+      await db.execute(
+        'UPDATE __pocketsync_device_state SET last_cleanup_timestamp = ?',
+        [currentTime],
+      );
+      
+      return deletedCount;
     } catch (e) {
       Logger.log('Error cleaning up old sync records: $e');
       return 0;
@@ -292,6 +325,44 @@ class SchemaManager {
     };
   }
 
+  /// Checks if a reset is needed for the current plugin version
+  ///
+  /// Returns true if the stored version is different from the current version
+  /// or if no version is stored yet.
+  Future<bool> _shouldResetForVersion(
+    Database db,
+    String currentVersion,
+  ) async {
+    try {
+      // Check if we have a version record
+      final result = await db.query('__pocketsync_version', where: 'id = 1');
+
+      if (result.isEmpty) {
+        // No version record, reset needed
+        return true;
+      }
+
+      final storedVersion = result.first['version'] as String;
+      return storedVersion != currentVersion;
+    } catch (e) {
+      Logger.log('SchemaManager: Error checking version: $e');
+      // If there's an error, assume reset is needed
+      return true;
+    }
+  }
+
+  /// Saves the current plugin version after a successful reset
+  Future<void> _saveCurrentVersion(Database db, String version) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    await db.execute('''
+      INSERT OR REPLACE INTO __pocketsync_version (id, version, last_reset_timestamp)
+      VALUES (1, ?, ?)
+    ''', [version, timestamp]);
+
+    Logger.log('SchemaManager: Updated stored plugin version to $version');
+  }
+
   Future<void> disableTriggers(Database db) async {
     final tables = await _getUserTables(db);
 
@@ -314,12 +385,22 @@ class SchemaManager {
   /// 2. Dropping all PocketSync internal tables (both current and previous versions)
   /// 3. Recreating the necessary tables
   /// 4. Re-enabling change tracking
+  /// 5. Storing the current plugin version to prevent unnecessary resets
   ///
   /// This is useful for resetting the sync state on a device or when migrating
   /// from a previous version of the SDK.
+  ///
+  /// The reset will only be performed if the current plugin version differs from
+  /// the stored version, ensuring it's only run once per plugin version.
   Future<void> reset(Database db) async {
-    // TODO: This should take the plugin version into account to
-    // it's run only once per plugin version.
+    // Check if reset is needed for the current plugin version
+    final shouldReset =
+        await _shouldResetForVersion(db, SyncConfig.pluginVersion);
+    if (!shouldReset) {
+      Logger.log(
+          'SchemaManager: Reset already performed for version ${SyncConfig.pluginVersion}, skipping');
+      return;
+    }
 
     try {
       await disableTriggers(db);
@@ -340,6 +421,9 @@ class SchemaManager {
 
       // 4. Re-enable change tracking
       await setupChangeTracking(db);
+
+      // 5. Store the current plugin version
+      await _saveCurrentVersion(db, SyncConfig.pluginVersion);
     } catch (e) {
       Logger.log('SchemaManager: Error during reset: $e');
       // Try to re-enable change tracking even if there was an error
