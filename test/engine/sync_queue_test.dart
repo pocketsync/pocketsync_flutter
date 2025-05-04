@@ -22,17 +22,18 @@ void main() {
         // Act
         syncQueue.addLocalChange('users', ChangeType.insert);
         syncQueue.addLocalChange('products', ChangeType.update);
-        
+
         // Assert
         expect(syncQueue.isEmpty, isFalse);
-        expect(syncQueue.getTablesWithPendingUploads(), containsAll(['users', 'products']));
+        expect(syncQueue.getTablesWithPendingUploads(),
+            containsAll(['users', 'products']));
       });
 
       test('should add multiple change types for the same table', () {
         // Act
         syncQueue.addLocalChange('users', ChangeType.insert);
         syncQueue.addLocalChange('users', ChangeType.update);
-        
+
         // Assert
         expect(syncQueue.getTablesWithPendingUploads(), ['users']);
       });
@@ -41,10 +42,10 @@ void main() {
         // Arrange
         syncQueue.addLocalChange('users', ChangeType.insert);
         syncQueue.addLocalChange('products', ChangeType.update);
-        
+
         // Act
         syncQueue.markTableUploaded('users');
-        
+
         // Assert
         expect(syncQueue.getTablesWithPendingUploads(), ['products']);
       });
@@ -54,7 +55,7 @@ void main() {
       test('should add remote change notification', () {
         // Act
         syncQueue.addRemoteChange();
-        
+
         // Assert
         expect(syncQueue.hasDownloads, isTrue);
         expect(syncQueue.isEmpty, isFalse);
@@ -63,10 +64,10 @@ void main() {
       test('should mark download as processed', () {
         // Arrange
         syncQueue.addRemoteChange();
-        
+
         // Act
         syncQueue.markDownloadProcessed();
-        
+
         // Assert
         expect(syncQueue.hasDownloads, isFalse);
       });
@@ -79,7 +80,9 @@ void main() {
             tableName: 'users',
             recordId: 'user1',
             operation: ChangeType.insert,
-            data: {'new': {'name': 'User 1'}},
+            data: {
+              'new': {'name': 'User 1'}
+            },
             timestamp: DateTime.now().millisecondsSinceEpoch,
             version: 1,
           ),
@@ -88,15 +91,17 @@ void main() {
             tableName: 'products',
             recordId: 'product1',
             operation: ChangeType.insert,
-            data: {'new': {'name': 'Product 1'}},
+            data: {
+              'new': {'name': 'Product 1'}
+            },
             timestamp: DateTime.now().millisecondsSinceEpoch,
             version: 1,
           ),
         ];
-        
+
         // Act
         syncQueue.addRemoteChanges(changes);
-        
+
         // Assert
         expect(syncQueue.getRemoteChanges().length, 2);
       });
@@ -109,16 +114,18 @@ void main() {
             tableName: 'users',
             recordId: 'user1',
             operation: ChangeType.insert,
-            data: {'new': {'name': 'User 1'}},
+            data: {
+              'new': {'name': 'User 1'}
+            },
             timestamp: DateTime.now().millisecondsSinceEpoch,
             version: 1,
           ),
         ];
         syncQueue.addRemoteChanges(changes);
-        
+
         // Act
         syncQueue.clearRemoteChanges();
-        
+
         // Assert
         expect(syncQueue.getRemoteChanges(), isEmpty);
       });
@@ -128,11 +135,11 @@ void main() {
       // Arrange
       syncQueue.addLocalChange('users', ChangeType.insert);
       syncQueue.addRemoteChange();
-      
+
       // Act
       syncQueue.markTableUploaded('users');
       syncQueue.markDownloadProcessed();
-      
+
       // Assert
       expect(syncQueue.isEmpty, isTrue);
     });

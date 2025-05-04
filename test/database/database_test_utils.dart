@@ -12,9 +12,9 @@ class DatabaseTestUtils {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
-  
+
   /// Creates an in-memory database with a test table.
-  /// 
+  ///
   /// Returns a Future that completes with the created database.
   static Future<Database> createInMemoryDatabase() async {
     return await databaseFactory.openDatabase(
@@ -34,9 +34,9 @@ class DatabaseTestUtils {
       ),
     );
   }
-  
+
   /// Creates database options for testing with an in-memory database.
-  /// 
+  ///
   /// Returns the DatabaseOptions configured for testing.
   static DatabaseOptions createTestDatabaseOptions() {
     return DatabaseOptions(
@@ -54,16 +54,16 @@ class DatabaseTestUtils {
       },
     );
   }
-  
+
   /// Creates a SchemaManager instance for testing.
-  /// 
+  ///
   /// Returns a new SchemaManager instance.
   static SchemaManager createSchemaManager() {
     return SchemaManager();
   }
-  
+
   /// Inserts test data into the users table.
-  /// 
+  ///
   /// [db] The database to insert data into.
   /// [count] The number of test users to insert.
   static Future<void> insertTestUsers(Database db, {int count = 5}) async {

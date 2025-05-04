@@ -12,7 +12,8 @@ void main() {
     });
 
     test('extracts table names from INSERT queries', () {
-      final sql = 'INSERT INTO users (name, email) VALUES ("John", "john@example.com")';
+      final sql =
+          'INSERT INTO users (name, email) VALUES ("John", "john@example.com")';
       final tables = extractAffectedTables(sql);
       expect(tables, contains('users'));
       expect(tables.length, 1);
@@ -33,14 +34,16 @@ void main() {
     });
 
     test('extracts multiple table names from JOIN queries', () {
-      final sql = 'SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id';
+      final sql =
+          'SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id';
       final tables = extractAffectedTables(sql);
       expect(tables, containsAll(['users', 'posts']));
       expect(tables.length, 2);
     });
 
     test('ignores temporary tables in WITH clauses', () {
-      final sql = 'WITH temp_users AS (SELECT * FROM users) SELECT * FROM temp_users JOIN posts ON temp_users.id = posts.user_id';
+      final sql =
+          'WITH temp_users AS (SELECT * FROM users) SELECT * FROM temp_users JOIN posts ON temp_users.id = posts.user_id';
       final tables = extractAffectedTables(sql);
       expect(tables, containsAll(['users', 'posts']));
       expect(tables, isNot(contains('temp_users')));
@@ -63,7 +66,7 @@ void main() {
         SELECT id, title, content FROM archived_posts
         WHERE created_at < datetime('now', '-1 year')
       ''';
-      
+
       final tables = extractAffectedTables(sql);
       expect(tables, containsAll(['posts', 'post_archives']));
       expect(tables, isNot(contains('archived_posts')));
@@ -73,7 +76,8 @@ void main() {
 
   group('determineChangeType', () {
     test('identifies INSERT operations', () {
-      final sql = 'INSERT INTO users (name, email) VALUES ("John", "john@example.com")';
+      final sql =
+          'INSERT INTO users (name, email) VALUES ("John", "john@example.com")';
       final changeType = determineChangeType(sql);
       expect(changeType, ChangeType.insert);
     });

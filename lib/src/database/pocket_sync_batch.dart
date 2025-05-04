@@ -123,7 +123,7 @@ class PocketSyncBatch implements Batch {
   @override
   void rawDelete(String sql, [List<Object?>? arguments]) {
     _batch.rawDelete(sql, arguments);
-    
+
     final tables = extractAffectedTables(sql);
     _mutations.addAll(tables.map((table) =>
         DatabaseMutation(tableName: table, changeType: ChangeType.delete)));
@@ -132,7 +132,7 @@ class PocketSyncBatch implements Batch {
   @override
   void rawUpdate(String sql, [List<Object?>? arguments]) {
     _batch.rawUpdate(sql, arguments);
-    
+
     final tables = extractAffectedTables(sql);
     _mutations.addAll(tables.map((table) =>
         DatabaseMutation(tableName: table, changeType: ChangeType.update)));

@@ -44,7 +44,8 @@ class DeviceFingerprintProvider {
     return digest.toString();
   }
 
-  Future<Map<String, dynamic>> getDeviceData(DeviceInfoPlugin deviceInfo) async {
+  Future<Map<String, dynamic>> getDeviceData(
+      DeviceInfoPlugin deviceInfo) async {
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
       return {

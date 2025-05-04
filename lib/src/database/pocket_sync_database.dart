@@ -19,7 +19,7 @@ class PocketSyncDatabase extends DatabaseExecutor {
       : _schemaManager = schemaManager;
 
   late final DatabaseWatcher _databaseWatcher;
-  
+
   /// Flag to track if database watcher is already initialized
   bool _databaseWatcherInitialized = false;
 

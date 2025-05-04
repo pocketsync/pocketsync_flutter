@@ -232,8 +232,9 @@ class SchemaManager {
   String generateUpdateCondition(List<String> columns) {
     // Exclude ps_global_id from the update condition to avoid triggering
     // changes when just the global ID is updated
-    final filteredColumns =
-        columns.where((col) => col != SyncConfig.defaultGlobalIdColumnName).toList();
+    final filteredColumns = columns
+        .where((col) => col != SyncConfig.defaultGlobalIdColumnName)
+        .toList();
 
     final conditions = filteredColumns.map((col) => '''(
           OLD.$col IS NOT NEW.$col OR 
