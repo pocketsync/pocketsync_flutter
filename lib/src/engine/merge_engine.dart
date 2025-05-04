@@ -2,6 +2,14 @@ import 'dart:async';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
 
+typedef ConflictNotificationCallback = void Function(
+  ConflictResolutionStrategy strategy,
+  SyncChange localChange,
+  SyncChange remoteChange,
+  SyncChange winningChange,
+  String syncSessionId,
+);
+
 class MergeEngine {
   final ConflictResolutionStrategy strategy;
   final ConflictResolver? customResolver;
@@ -28,6 +36,8 @@ class MergeEngine {
   Future<List<SyncChange>> resolveConflicts(
     List<SyncChange> localChanges,
     List<SyncChange> remoteChanges,
+    String syncSessionId,
+    ConflictNotificationCallback? conflictNotificationCallback,
   ) async {
     final mergedChanges = <SyncChange>[];
     final conflictMap = <String, List<SyncChange>>{};
@@ -79,6 +89,14 @@ class MergeEngine {
             break;
         }
 
+        conflictNotificationCallback?.call(
+          strategy,
+          localChange,
+          remoteChange,
+          winningChange,
+          syncSessionId,
+        );
+
         mergedChanges.add(winningChange);
       }
     }
@@ -90,8 +108,15 @@ class MergeEngine {
   Future<List<SyncChange>> mergeChanges(
     List<SyncChange> localChanges,
     List<SyncChange> remoteChanges,
+    String syncSessionId,
+    ConflictNotificationCallback? conflictNotificationCallback,
   ) async {
-    final resolvedChanges = await resolveConflicts(localChanges, remoteChanges);
+    final resolvedChanges = await resolveConflicts(
+      localChanges,
+      remoteChanges,
+      syncSessionId,
+      conflictNotificationCallback,
+    );
 
     return resolvedChanges;
   }
