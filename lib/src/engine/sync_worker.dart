@@ -170,8 +170,12 @@ class SyncWorker {
       }
 
       final localChanges = await _getPendingLocalChanges(remoteChanges);
-      final mergedChanges =
-          await _mergeEngine.mergeChanges(localChanges, remoteChanges);
+      final mergedChanges = await _mergeEngine.mergeChanges(
+        localChanges,
+        remoteChanges,
+        downloadedChanges.syncSessionId,
+        _onConflictDetected,
+      );
 
       for (final change in mergedChanges) {
         try {
@@ -324,9 +328,19 @@ class SyncWorker {
     );
   }
 
-  /// Checks if the sync worker is currently running.
-  bool get isRunning => _isRunning;
-
-  /// Checks if a sync operation is currently in progress.
-  bool get isSyncing => _isSyncing;
+  void _onConflictDetected(
+    ConflictResolutionStrategy strategy,
+    SyncChange localChange,
+    SyncChange remoteChange,
+    SyncChange winningChange,
+    String syncSessionId,
+  ) {
+    _apiClient.reportConflict(
+      strategy,
+      localChange,
+      remoteChange,
+      winningChange,
+      syncSessionId,
+    );
+  }
 }

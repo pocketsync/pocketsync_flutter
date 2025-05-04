@@ -19,6 +19,9 @@ class PocketSyncDatabase extends DatabaseExecutor {
       : _schemaManager = schemaManager;
 
   late final DatabaseWatcher _databaseWatcher;
+  
+  /// Flag to track if database watcher is already initialized
+  bool _databaseWatcherInitialized = false;
 
   @override
   Database get database => _db!;
@@ -66,7 +69,11 @@ class PocketSyncDatabase extends DatabaseExecutor {
         singleInstance: true,
       ),
     );
-    _databaseWatcher = databaseWatcher;
+    // Only set the database watcher if it hasn't been initialized already
+    if (!_databaseWatcherInitialized) {
+      _databaseWatcher = databaseWatcher;
+      _databaseWatcherInitialized = true;
+    }
   }
 
   /// Returns a new batch for database operations.

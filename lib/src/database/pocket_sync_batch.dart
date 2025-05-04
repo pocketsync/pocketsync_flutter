@@ -121,10 +121,20 @@ class PocketSyncBatch implements Batch {
   int get length => _batch.length;
 
   @override
-  void rawDelete(String sql, [List<Object?>? arguments]) =>
-      _batch.rawDelete(sql, arguments);
+  void rawDelete(String sql, [List<Object?>? arguments]) {
+    _batch.rawDelete(sql, arguments);
+    
+    final tables = extractAffectedTables(sql);
+    _mutations.addAll(tables.map((table) =>
+        DatabaseMutation(tableName: table, changeType: ChangeType.delete)));
+  }
 
   @override
-  void rawUpdate(String sql, [List<Object?>? arguments]) =>
-      _batch.rawUpdate(sql, arguments);
+  void rawUpdate(String sql, [List<Object?>? arguments]) {
+    _batch.rawUpdate(sql, arguments);
+    
+    final tables = extractAffectedTables(sql);
+    _mutations.addAll(tables.map((table) =>
+        DatabaseMutation(tableName: table, changeType: ChangeType.update)));
+  }
 }

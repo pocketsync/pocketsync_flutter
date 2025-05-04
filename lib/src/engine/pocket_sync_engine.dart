@@ -67,7 +67,9 @@ class PocketSyncEngine {
 
     await schemaManager.registerDevice(database.database, deviceFingerprint);
 
-    _apiClient.setupClient(options, deviceFingerprint);
+    _apiClient
+      ..setupClient(options, deviceFingerprint)
+      ..setDeviceInfos(await _deviceFingerprintProvider.getDeviceData(deviceInfo));
 
     // Process pre-existing data if enabled
     await schemaManager.syncPreExistingData(database.database, options);
