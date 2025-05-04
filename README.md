@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">PocketSync</h1>
+  <img src="logo_full.svg" alt="PocketSync Logo" width="200">
   <p align="center">Seamless SQLite synchronization for Flutter applications</p>
 </p>
 
@@ -13,7 +13,7 @@
 
 PocketSync enables seamless data synchronization across devices without managing your own backend infrastructure. It works with SQLite databases and handles all the complexities of data synchronization for you.
 
-> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. Features and APIs may change without notice.
+> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. Features and APIs are quite stable now, but may change without notice.
 
 ## Features
 
@@ -175,6 +175,8 @@ Clear all sync tracking data (use with caution):
 await PocketSync.instance.reset();
 ```
 
+> **Note:** Call `PocketSync.instance.reset()` before calling `PocketSync.instance.start()` to reset the sync engine (for existing apps. Be cautious when using this method as it will clear all change tracking data). It runs once per plugin version (the goal is to provide a smooth transition for people that were using the sdk prior to version 0.3.0)
+
 ### Dispose Resources
 
 Clean up resources when the app is closing:
@@ -190,15 +192,14 @@ await PocketSync.instance.dispose();
 - PocketSync now uses SQLite FFI to fix issues with JSON_OBJECT function not being available on some Android devices
 - The implementation uses sqflite_common_ffi and sqlite3_flutter_libs packages to provide a more recent version of SQLite with JSON function support
 - A SqliteFfiHelper class was created to initialize the FFI implementation before database operations
-- Call `PocketSync.instance.reset()` before calling `PocketSync.instance.start()` to reset the sync engine
+- Call `PocketSync.instance.reset()` before calling `PocketSync.instance.start()` to reset the sync engine.
 
 ## Best practices
 
 1. **Initialize early**: Initialize PocketSync during app startup
 2. **Handle conflicts**: Choose an appropriate conflict resolution strategy for your app
 3. **Batch operations**: Group related database operations to optimize sync performance
-4. **Error handling**: Implement proper error handling for sync operations
-5. **User authentication**: Set the user ID when the user logs in
+4. **User authentication**: Set the user ID when the user logs in (sync will not work without a user ID)
 
 ## Support
 
