@@ -56,8 +56,8 @@ class SyncChange {
     // Parse the operation string to the enum value
     final operationStr = record['operation'] as String;
     final operation = ChangeType.values.firstWhere(
-      (op) => op.name.toUpperCase() == operationStr,
-      orElse: () => ChangeType.update,
+      (op) => op.name.toLowerCase() == operationStr.toLowerCase(),
+      orElse: () => ChangeType.insert,
     );
 
     // Parse the JSON data

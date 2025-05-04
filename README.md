@@ -17,11 +17,11 @@ PocketSync enables seamless data synchronization across devices without managing
 
 ## Features
 
-- **Offline-First Architecture**: Continue working with your data even when offline
-- **Automatic Synchronization**: Changes are automatically synchronized when connectivity is restored
-- **Conflict Resolution**: Multiple built-in strategies for handling conflicts
-- **Optimized Change Tracking**: Efficiently tracks and batches changes to minimize network usage
-- **SQLite Integration**: Built on top of SQLite for reliable local data storage
+- **Offline-first architecture**: Continue working with your data even when offline
+- **Automatic synchronization**: Changes are automatically synchronized when connectivity is restored
+- **Conflict resolution**: Multiple built-in strategies for handling conflicts
+- **Optimized change tracking**: Efficiently tracks and batches changes to minimize network usage
+- **SQLite integration**: Built on top of SQLite for reliable local data storage
 - **Customizable**: Flexible configuration options to suit your specific needs
 
 ## Installation
