@@ -10,6 +10,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class PocketSyncNetworkClient {
   final String _baseUrl;
+  final Dio _dio = Dio();
 
   String? _deviceId;
   String? _userId;
@@ -35,6 +36,20 @@ class PocketSyncNetworkClient {
       'x-project-id': options.projectId,
       'x-device-id': deviceId,
     });
+  }
+
+  void setDeviceInfos(Map<String, dynamic> deviceInfos) {
+    if (_deviceId != null && _userId != null) {
+      try {
+        _dio.put(
+          '$_baseUrl/devices/$_deviceId/user/$_userId/info',
+          data: deviceInfos,
+          options: Options(headers: _headers),
+        );
+      } on DioException catch (e) {
+        Logger.log('Error uploading device info: ${e.message}');
+      }
+    }
   }
 
   void setUserId(String userId) {
@@ -121,8 +136,7 @@ class PocketSyncNetworkClient {
       // Convert the batch to JSON
       final payload = batch.toJson();
 
-      final dio = Dio();
-      final response = await dio.post(
+      final response = await _dio.post(
         '$_baseUrl/sync/upload',
         data: payload,
         options: Options(headers: _headers),
@@ -150,6 +164,7 @@ class PocketSyncNetworkClient {
         count: 0,
         timestamp: DateTime.now(),
         changes: [],
+        syncSessionId: '',
       );
     }
 
@@ -159,8 +174,7 @@ class PocketSyncNetworkClient {
 
       final sinceTimestamp = timestamp.millisecondsSinceEpoch;
 
-      final dio = Dio();
-      final response = await dio.get(
+      final response = await _dio.get(
         '$_baseUrl/sync/download',
         queryParameters: {'since': sinceTimestamp},
         options: Options(headers: _headers),
@@ -173,14 +187,54 @@ class PocketSyncNetworkClient {
           count: 0,
           timestamp: DateTime.now(),
           changes: [],
+          syncSessionId: '',
         );
       }
-    } on DioException catch (_) {
+    } on DioException catch (e) {
+      Logger.log('Error downloading changes: ${e.response}');
       return ChangesResponse(
         count: 0,
         timestamp: DateTime.now(),
         changes: [],
+        syncSessionId: '',
       );
+    }
+  }
+
+  Future<void> reportConflict(
+    ConflictResolutionStrategy strategy,
+    SyncChange localChange,
+    SyncChange remoteChange,
+    SyncChange winningChange,
+    String syncSessionId,
+  ) async {
+    try {
+      await _dio.post(
+        '$_baseUrl/conflicts/report',
+        data: {
+          'tableName': localChange.tableName,
+          'recordId': localChange.recordId,
+          'clientData': localChange.data,
+          'serverData': remoteChange.data,
+          'resolutionStrategy': switch (strategy) {
+            ConflictResolutionStrategy.lastWriteWins => 'LAST_WRITE_WINS',
+            ConflictResolutionStrategy.serverWins => 'SERVER_WINS',
+            ConflictResolutionStrategy.clientWins => 'CLIENT_WINS',
+            ConflictResolutionStrategy.custom => 'CUSTOM',
+          },
+          'resolvedData': winningChange.data,
+          'metadata': {
+            'deviceId': _deviceId,
+            'userId': _userId,
+          },
+        },
+        queryParameters: {'syncSessionId': syncSessionId},
+        options: Options(headers: _headers),
+      );
+      Logger.log(
+          'Conflict reported: ${localChange.tableName}:${localChange.recordId}');
+    } on DioException catch (e) {
+      Logger.log('Error reporting conflict: ${e.response}');
     }
   }
 

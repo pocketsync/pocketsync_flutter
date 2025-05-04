@@ -43,4 +43,32 @@ class DeviceFingerprintProvider {
     final digest = sha256.convert(bytes);
     return digest.toString();
   }
+
+  Future<Map<String, dynamic>> getDeviceData(DeviceInfoPlugin deviceInfo) async {
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      return {
+        'brand': androidInfo.brand,
+        'device': androidInfo.device,
+        'id': androidInfo.id,
+        'model': androidInfo.model,
+        'product': androidInfo.product,
+        'hardware': androidInfo.hardware,
+        'bootloader': androidInfo.bootloader,
+      };
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      return {
+        'name': iosInfo.name,
+        'systemName': iosInfo.systemName,
+        'model': iosInfo.model,
+        'localizedModel': iosInfo.localizedModel,
+        'identifierForVendor': iosInfo.identifierForVendor,
+        'utsnameMachine': iosInfo.utsname.machine,
+        'utsnameNodename': iosInfo.utsname.nodename,
+      };
+    } else {
+      throw UnsupportedError('Unsupported platform');
+    }
+  }
 }
