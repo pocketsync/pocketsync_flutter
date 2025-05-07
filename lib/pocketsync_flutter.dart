@@ -7,3 +7,4 @@ export 'src/models/types.dart'
         PocketSyncOptions,
         ConflictResolutionStrategy,
         ConflictResolver;
+export 'src/models/sync_change.dart';

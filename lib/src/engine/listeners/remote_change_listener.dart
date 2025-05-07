@@ -21,9 +21,8 @@ class RemoteChangeListener extends ChangeListener {
 
   @override
   void startListening() {
-    final notificationStream = _apiClient.listenForRemoteChanges(since: since);
+    final notificationStream = _apiClient.listenForRemoteChanges(since: since, onServerConnected: _onServerConnected);
     _subscription = notificationStream.listen(_onRemoteChange);
-    Logger.log('RemoteChangeListener: Started listening for remote changes');
   }
 
   void _onRemoteChange(SyncNotification notification) {
@@ -37,12 +36,14 @@ class RemoteChangeListener extends ChangeListener {
     _subscription?.cancel();
     _subscription = null;
     _apiClient.stopListening();
-    Logger.log('RemoteChangeListener: Stopped listening for remote changes');
+  }
+
+  void _onServerConnected() {
+    _syncScheduler.forceSyncNow();
   }
 
   @override
   void dispose() {
     stopListening();
-    Logger.log('RemoteChangeListener: Disposed');
   }
 }

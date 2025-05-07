@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
-import 'package:pocketsync_flutter/src/models/sync_change.dart';
 
 typedef ConflictNotificationCallback = void Function(
   ConflictResolutionStrategy strategy,
@@ -87,6 +86,12 @@ class MergeEngine {
           case ConflictResolutionStrategy.custom:
             winningChange = await customResolver!(localChange, remoteChange);
             break;
+        }
+
+        // validate winning change as data with "old" and "new" keys
+        // Ensure the winning change has at least one of the required data keys
+        if (winningChange.data['old'] == null && winningChange.data['new'] == null) {
+          throw ArgumentError('Winning change must have at least one of "old" or "new" keys');
         }
 
         conflictNotificationCallback?.call(
