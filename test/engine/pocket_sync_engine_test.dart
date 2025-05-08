@@ -131,9 +131,10 @@ void main() {
 
       // Mock the stream for remote changes
       final mockStream = Stream<SyncNotification>.empty();
-      when(() =>
-              mockApiClient.listenForRemoteChanges(since: any(named: 'since')))
-          .thenAnswer((_) => mockStream);
+      when(() => mockApiClient.listenForRemoteChanges(
+            since: any(named: 'since'),
+            onServerConnected: any(named: 'onServerConnected'),
+          )).thenAnswer((_) => mockStream);
 
       // Create options
       options = PocketSyncOptions(

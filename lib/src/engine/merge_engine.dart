@@ -90,8 +90,10 @@ class MergeEngine {
 
         // validate winning change as data with "old" and "new" keys
         // Ensure the winning change has at least one of the required data keys
-        if (winningChange.data['old'] == null && winningChange.data['new'] == null) {
-          throw ArgumentError('Winning change must have at least one of "old" or "new" keys');
+        if (winningChange.data['old'] == null &&
+            winningChange.data['new'] == null) {
+          throw ArgumentError(
+              'Winning change must have at least one of "old" or "new" keys');
         }
 
         conflictNotificationCallback?.call(

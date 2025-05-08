@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="logo_full.svg" alt="PocketSync Logo" width="200">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo_full-dark.svg">
+    <img src="logo_full.svg" alt="PocketSync Logo" width="200">
+  </picture>
   <p align="center">Seamless SQLite synchronization for Flutter applications</p>
 </p>
 

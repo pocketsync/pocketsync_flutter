@@ -21,7 +21,8 @@ class RemoteChangeListener extends ChangeListener {
 
   @override
   void startListening() {
-    final notificationStream = _apiClient.listenForRemoteChanges(since: since, onServerConnected: _onServerConnected);
+    final notificationStream = _apiClient.listenForRemoteChanges(
+        since: since, onServerConnected: _onServerConnected);
     _subscription = notificationStream.listen(_onRemoteChange);
   }
 

@@ -61,7 +61,8 @@ class PocketSyncNetworkClient {
   ///
   /// This method establishes a connection to the server's Socket.IO endpoint
   /// and listens for change notifications.
-  Stream<SyncNotification> listenForRemoteChanges({DateTime? since, void Function()? onServerConnected}) {
+  Stream<SyncNotification> listenForRemoteChanges(
+      {DateTime? since, void Function()? onServerConnected}) {
     if (_notificationStream != null) {
       return _notificationStream!;
     }
