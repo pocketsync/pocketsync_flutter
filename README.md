@@ -31,7 +31,7 @@ PocketSync enables seamless data synchronization across devices without managing
 
 ```yaml
 dependencies:
-  pocketsync_flutter: ^0.3.0
+  pocketsync_flutter: ^0.4.0
 ```
 
 Then run:
@@ -119,7 +119,7 @@ stream.listen((event) {
 });
 ```
 
-Read more: [PocketSync Database](https://docs.pocketsync.dev/pocket-sync/database)
+Read more: [PocketSync Database](https://docs.pocketsync.dev/database)
 
 ### 3. Manual sync control
 

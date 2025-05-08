@@ -1,10 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pocketsync_flutter/src/engine/connectivity_monitor.dart';
+import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
 
 class MockSyncQueue extends Mock implements SyncQueue {}
+
+class MockPocketSyncNetworkClient extends Mock
+    implements PocketSyncNetworkClient {}
+
+class MockConnectivityMonitor extends Mock implements ConnectivityMonitor {}
 
 void main() {
   group('SyncScheduler', () {

@@ -28,6 +28,11 @@ class PocketSyncNetworkClient {
   StreamController<SyncNotification>? _notificationController;
   Stream<SyncNotification>? _notificationStream;
 
+  // Connection monitoring
+  final StreamController<bool> _connectionStreamController =
+      StreamController<bool>.broadcast();
+  bool _isConnected = false;
+
   void setupClient(PocketSyncOptions options, String deviceId) {
     _deviceId = deviceId;
 
@@ -92,15 +97,21 @@ class PocketSyncNetworkClient {
           'since': since?.millisecondsSinceEpoch,
         });
 
+        _isConnected = true;
+        _connectionStreamController.add(true);
         Logger.log('Connected to server');
         onServerConnected?.call();
       });
 
       _socket!.onConnectError((error) {
+        _isConnected = false;
+        _connectionStreamController.add(false);
         Logger.log('Connection error: $error');
       });
 
       _socket!.onDisconnect((_) {
+        _isConnected = false;
+        _connectionStreamController.add(false);
         Logger.log('Disconnected');
       });
 
@@ -240,6 +251,21 @@ class PocketSyncNetworkClient {
     }
   }
 
+  /// Gets the current connection status based on socket connection.
+  bool isServerReachable() {
+    return _isConnected;
+  }
+
+  /// Gets a stream of connection status updates.
+  ///
+  /// This stream emits a boolean value whenever the connection status changes.
+  /// `true` indicates that the device is connected to the server, while `false`
+  /// indicates that it is disconnected.
+  Stream<bool> get connectionStream => _connectionStreamController.stream;
+
+  /// Gets the current connection status.
+  bool get isConnected => _isConnected;
+
   /// Stops listening for remote changes.
   void stopListening() {
     _socket?.disconnect();
@@ -251,7 +277,11 @@ class PocketSyncNetworkClient {
   /// Disposes of resources.
   void dispose() {
     stopListening();
-    _socket?.dispose();
+    _socket?.disconnect();
     _socket = null;
+    _notificationController?.close();
+    _notificationController = null;
+    _notificationStream = null;
+    _connectionStreamController.close();
   }
 }

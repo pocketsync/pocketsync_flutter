@@ -1,14 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/change_aggregator.dart';
+import 'package:pocketsync_flutter/src/engine/connectivity_monitor.dart';
 import 'package:pocketsync_flutter/src/engine/merge_engine.dart';
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
-import 'package:pocketsync_flutter/src/models/sync_change.dart';
+import 'package:pocketsync_flutter/src/engine/sync_batch_processor.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
+import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
+import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Processes the sync queue when activated.
@@ -24,6 +28,8 @@ class SyncWorker {
   final PocketSyncNetworkClient _apiClient;
   final Database _database;
   final DatabaseWatcher _databaseWatcher;
+  late ConnectivityMonitor _connectivityMonitor;
+  late SyncBatchProcessor _batchProcessor;
 
   bool _isRunning = false;
   bool _isSyncing = false;
@@ -43,7 +49,9 @@ class SyncWorker {
     required MergeEngine mergeEngine,
     required SchemaManager schemaManager,
     Duration? syncInterval,
+    int? maxBatchSize,
     DatabaseWatcher? databaseWatcher,
+    ConnectivityMonitor? connectivityMonitor,
   })  : _syncQueue = syncQueue,
         _changeAggregator = changeAggregator,
         _apiClient = apiClient,
@@ -51,7 +59,22 @@ class SyncWorker {
         _mergeEngine = mergeEngine,
         _schemaManager = schemaManager,
         _syncInterval = syncInterval ?? const Duration(minutes: 5),
-        _databaseWatcher = databaseWatcher ?? DatabaseWatcher();
+        _databaseWatcher = databaseWatcher ?? DatabaseWatcher() {
+    // Initialize the connectivity monitor
+    _connectivityMonitor = connectivityMonitor ??
+        ConnectivityMonitor(
+          networkClient: _apiClient,
+          onConnected: _onConnectivityRestored,
+        );
+
+    // Initialize the batch processor
+    _batchProcessor = SyncBatchProcessor(
+      database: _database,
+      apiClient: _apiClient,
+      changeAggregator: _changeAggregator,
+      maxBatchSize: maxBatchSize ?? SyncConfig.defaultMaxBatchSize,
+    );
+  }
 
   /// Starts the sync worker.
   ///
@@ -61,6 +84,9 @@ class SyncWorker {
     if (_isRunning) return;
 
     _isRunning = true;
+
+    // Start monitoring connectivity
+    _connectivityMonitor.startMonitoring();
 
     // Process the queue immediately when starting
     await processQueue();
@@ -84,6 +110,41 @@ class SyncWorker {
     _isRunning = false;
   }
 
+  /// Called when connectivity is restored.
+  Future<void> _onConnectivityRestored() async {
+    Logger.log('SyncWorker: Connectivity restored, processing queue');
+
+    if (!_isSyncing) {
+      await processQueue();
+    }
+  }
+
+  /// Disposes of resources used by the sync worker.
+  void dispose() {
+    _syncTimer?.cancel();
+    _connectivityMonitor.dispose();
+  }
+
+  // Test helper methods
+
+  /// For testing only: Set a mock connectivity monitor
+  @visibleForTesting
+  void testSetConnectivityMonitor(ConnectivityMonitor monitor) {
+    _connectivityMonitor = monitor;
+  }
+
+  /// For testing only: Set a mock batch processor
+  @visibleForTesting
+  void testSetBatchProcessor(SyncBatchProcessor processor) {
+    _batchProcessor = processor;
+  }
+
+  /// For testing only: Trigger the connectivity restored callback
+  @visibleForTesting
+  Future<void> testOnConnectivityRestored() async {
+    await _onConnectivityRestored();
+  }
+
   /// Processes the sync queue.
   ///
   /// This method handles both upload and download operations:
@@ -95,12 +156,17 @@ class SyncWorker {
     try {
       _isSyncing = true;
 
-      // Process uploads first
-      await _processUploads();
-
-      // Then process downloads if there are any
-      if (_syncQueue.hasDownloads) {
-        await _processDownloads(since: await getLastDownloadTimestamp());
+      final isConnected = _connectivityMonitor.isConnected;
+      if (isConnected) {
+        if (_syncQueue.getTablesWithPendingUploads().isNotEmpty) {
+          await _processUploads();
+        }
+        if (_syncQueue.hasDownloads) {
+          await _processDownloads(since: await getLastDownloadTimestamp());
+        }
+      } else {
+        Logger.log(
+            'SyncWorker: Server not connected, will sync when connection is restored');
       }
     } finally {
       _isSyncing = false;
@@ -115,31 +181,25 @@ class SyncWorker {
     // Get tables with pending upload changes
     final tables = _syncQueue.getTablesWithPendingUploads();
 
-    // Process each table
+    // Process unsynced changes using the batch processor
+    final results = await _batchProcessor.processUnsyncedChanges(tables);
+
+    // Mark tables as processed based on results
     for (final table in tables) {
-      try {
-        // Aggregate changes for the table
-        final changes = await _changeAggregator.aggregateChanges(table);
+      final success = results[table] ?? false;
 
-        if (changes.changes.isEmpty) {
-          continue;
-        }
+      if (success) {
+        final aggregatedChanges =
+            await _changeAggregator.aggregateChanges(table);
 
-        // Send changes to the server
-        final success = await _apiClient.uploadChanges(changes.changes);
+        await _batchProcessor.markChangesAsSynced(
+            table, aggregatedChanges.affectedChangeIds);
 
-        if (success) {
-          // Mark changes as synced in the database
-          await _markChangesAsSynced(
-            table,
-            changes.affectedChangeIds,
-          );
+        _syncQueue.markTableUploaded(table);
 
-          // Mark changes as processed in the queue
-          _syncQueue.markTableUploaded(table);
-        }
-      } catch (e) {
-        Logger.log('SyncWorker: Error processing upload for table $table: $e');
+        Logger.log('SyncWorker: Successfully synced changes for table $table');
+      } else {
+        Logger.log('SyncWorker: Failed to sync some changes for table $table');
       }
     }
   }
@@ -166,6 +226,12 @@ class SyncWorker {
 
       if (remoteChanges.isEmpty) {
         _syncQueue.markDownloadProcessed();
+
+        // Update the last download timestamp even when there are no changes
+        await _database.rawUpdate(
+          'UPDATE __pocketsync_device_state SET last_download_timestamp = ?',
+          [downloadedChanges.timestamp.millisecondsSinceEpoch],
+        );
         return;
       }
 
@@ -185,20 +251,15 @@ class SyncWorker {
         }
       }
 
-      // Clear processed remote changes
       _syncQueue
         ..clearRemoteChanges()
         ..markDownloadProcessed();
 
-      // Update device state
       await _database.rawUpdate(
         'UPDATE __pocketsync_device_state SET last_download_timestamp = ?',
         [DateTime.now().millisecondsSinceEpoch],
       );
 
-      // Notify listeners about the changes
-      // This is necessary because the engine internally does not use the database wrapper
-      // and does not notify listeners about changes.
       for (final table in _getTables(remoteChanges)) {
         _databaseWatcher.notifyListeners(table, ChangeType.update,
             triggerSync: false);
@@ -226,7 +287,6 @@ class SyncWorker {
     try {
       switch (change.operation) {
         case ChangeType.insert || ChangeType.update:
-          // Insert or update record
           final newData = Map<String, dynamic>.from(data['new']);
           if (newData.isEmpty) {
             return;
@@ -243,9 +303,8 @@ class SyncWorker {
           break;
 
         case ChangeType.delete:
-          // Delete record
           await _database.rawDelete(
-            'DELETE FROM $tableName WHERE ps_global_id = ?',
+            'DELETE FROM $tableName WHERE ${SyncConfig.defaultGlobalIdColumnName} = ?',
             [recordId],
           );
           break;
@@ -265,11 +324,9 @@ class SyncWorker {
       List<SyncChange> remoteChanges) async {
     final localChanges = <SyncChange>[];
 
-    // Create a set of table:recordId keys for quick lookup
     final remoteChangeKeys =
         remoteChanges.map((c) => '${c.tableName}:${c.recordId}').toSet();
 
-    // Query the database for pending changes that match the remote records
     for (final key in remoteChangeKeys) {
       final parts = key.split(':');
       if (parts.length != 2) continue;
@@ -277,40 +334,17 @@ class SyncWorker {
       final tableName = parts[0];
       final recordId = parts[1];
 
-      // Query for pending changes for this record
       final rows = await _database.query(
         '__pocketsync_changes',
         where: 'table_name = ? AND record_rowid = ? AND synced = 0',
         whereArgs: [tableName, recordId],
       );
 
-      // Convert rows to SyncChange objects
       final changes = SyncChange.fromDatabaseRecords(rows);
       localChanges.addAll(changes);
     }
 
     return localChanges;
-  }
-
-  /// Marks changes as synced in the database.
-  ///
-  /// This method updates the __pocketsync_changes table to mark the specified
-  /// changes as synced.
-  Future<void> _markChangesAsSynced(
-      String tableName, List<String> changeIds) async {
-    if (changeIds.isEmpty) return;
-
-    // Update the changes table to mark these changes as synced
-    await _database.rawUpdate(
-      'UPDATE __pocketsync_changes SET synced = 1 WHERE id IN (${changeIds.map((_) => '?').join(', ')})',
-      changeIds,
-    );
-
-    // Update device state
-    await _database.rawUpdate(
-      'UPDATE __pocketsync_device_state SET last_upload_timestamp = ?',
-      [DateTime.now().millisecondsSinceEpoch],
-    );
   }
 
   Future<DateTime> getLastDownloadTimestamp() async {
