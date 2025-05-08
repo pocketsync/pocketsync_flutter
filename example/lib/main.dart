@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:path/path.dart';
@@ -8,22 +9,16 @@ void main() async {
 
   String path = join(await getDatabasesPath(), 'todo_database.db');
 
-  const projectId = String.fromEnvironment('PS_PROJECT_ID');
-  const authToken = String.fromEnvironment('PS_AUTH_TOKEN');
-  const serverUrl = String.fromEnvironment('PS_SERVER_URL',
-      defaultValue: 'https://api.pocketsync.dev');
-
   await PocketSync.initialize(
-    dbPath: path,
     options: PocketSyncOptions(
-      projectId: projectId,
-      authToken: authToken,
-      serverUrl: serverUrl,
-      // serverUrl: defaultTargetPlatform == TargetPlatform.android
-      //     ? 'http://10.0.2.2:3000'
-      //     : 'http://127.0.0.1:3000',
+      projectId: '1d0c9a33-e5bd-4149-9971-8b2568f22469',
+      authToken: 'ds_NzhkNzk3ZWE1NGE1NDA1NDk0ZGU5ODAxZDBkZjQ4MmY=',
+      serverUrl: defaultTargetPlatform == TargetPlatform.android
+          ? 'http://10.0.2.2:3000'
+          : 'http://127.0.0.1:3000',
     ),
     databaseOptions: DatabaseOptions(
+      dbPath: path,
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE todos(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, isCompleted INTEGER)',
@@ -33,7 +28,7 @@ void main() async {
   );
 
   // Set user ID - In a real app, this would come from your auth system
-  await PocketSync.instance.setUserId(userId: 'test-user');
+  PocketSync.instance.setUserId('test-user');
 
   // Start syncing
   await PocketSync.instance.start();

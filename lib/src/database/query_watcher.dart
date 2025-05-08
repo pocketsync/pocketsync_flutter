@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:sqflite/sqflite.dart';
 
 class QueryWatcher {
   final String sql;
@@ -19,7 +19,7 @@ class QueryWatcher {
     _controller.close();
   }
 
-  Future<void> notify(PocketSyncDatabase db) async {
+  Future<void> notify(Database db) async {
     if (!_isActive) return;
 
     try {

@@ -1,5 +1,8 @@
 <p align="center">
-  <h1 align="center">PocketSync</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo_full-dark.svg">
+    <img src="logo_full.svg" alt="PocketSync Logo" width="200">
+  </picture>
   <p align="center">Seamless SQLite synchronization for Flutter applications</p>
 </p>
 
@@ -11,244 +14,202 @@
 
 ---
 
-PocketSync is a powerful Flutter package that enables seamless data synchronization across devices without managing backend infrastructure. It works with SQLite databases and handles all the complexities of data synchronization for you.
+PocketSync enables seamless data synchronization across devices without managing your own backend infrastructure. It works with SQLite databases and handles all the complexities of data synchronization for you.
 
-> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. Features and APIs may change without notice.
+> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. Features and APIs are quite stable now, but may change without notice.
 
 ## Features
 
-- **Automatic Sync** – Changes in your SQLite database sync seamlessly across devices
-- **Offline Support** – Changes are queued and synced when the device reconnects
-- **Last Write Wins** – Simple conflict resolution ensures predictable data handling
-- **Zero Backend Setup** – No need to build or manage a backend—PocketSync does it for you
-- **Change Tracking** – Monitor database changes in real-time with the watch API
-- **Customizable** – Implement your own conflict resolution strategies
+- **Offline-first architecture**: Continue working with your data even when offline
+- **Automatic synchronization**: Changes are automatically synchronized when connectivity is restored
+- **Conflict resolution**: Multiple built-in strategies for handling conflicts
+- **Optimized change tracking**: Efficiently tracks and batches changes to minimize network usage
+- **SQLite integration**: Built on top of SQLite for reliable local data storage
+- **Customizable**: Flexible configuration options to suit your specific needs
 
-## Quick Start
-
-### Installation
+## Installation
 
 ```yaml
 dependencies:
-  pocketsync_flutter: ^0.2.0
+  pocketsync_flutter: ^0.3.0
 ```
 
-Or install via command line:
+Then run:
 
 ```bash
-flutter pub add pocketsync_flutter
+flutter pub get
 ```
 
-### Basic Setup
+## Quick start
 
-1. Create an account at [pocketsync.dev](https://pocketsync.dev)
-2. Create a new project in the PocketSync console
-3. Initialize PocketSync in your app:
+You'll need to create a PocketSync project in the [PocketSync dashboard](https://pocketsync.dev) and get your project ID, auth token, and server URL.
+
+### 1. Initialize PocketSync
 
 ```dart
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+Future<void> initPocketSync() async {
+  // Get the database path
+  String dbPath = join(await getDatabasesPath(), 'my_app_database.db');
   
-  final dbPath = join(await getDatabasesPath(), 'my_app.db');
-  
-  try {
-    await PocketSync.initialize(
+  // Initialize PocketSync
+  await PocketSync.initialize(
+    options: PocketSyncOptions(
+      projectId: 'YOUR_PROJECT_ID',
+      authToken: 'YOUR_AUTH_TOKEN',
+      serverUrl: 'https://api.pocketsync.dev',
+      // Optional configurations
+      conflictResolutionStrategy: ConflictResolutionStrategy.lastWriteWins,
+      verbose: true,
+    ),
+    databaseOptions: DatabaseOptions(
       dbPath: dbPath,
-      options: PocketSyncOptions(
-        projectId: 'your-project-id',
-        authToken: 'your-auth-token',
-        serverUrl: 'https://api.pocketsync.dev',
-      ),
-      databaseOptions: databaseOptions,
-    );
-
-    await PocketSync.instance.setUserId(userId: 'user-123');
-    await PocketSync.instance.start();
-  } catch (e) {
-    print('Failed to initialize PocketSync: $e');
-  }
+      version: 1,
+      onCreate: (db, version) async {
+        // Create your database tables
+        await db.execute('''
+          CREATE TABLE todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            isCompleted INTEGER
+          )
+        ''');
+      },
+    ),
+  );
+  
+  // Start the sync engine
+  await PocketSync.instance.start();
 }
 ```
 
-## Database Operations
-
-PocketSyncDatabase is a wrapper around the `sqflite` package, providing additional features for syncing data across devices. 
-
-### CRUD Operations
+### 2. Use the PocketSync database
 
 ```dart
+// Get a reference to the database
 final db = PocketSync.instance.database;
 
-// Create
+// Insert data
 await db.insert('todos', {
-  'id': 'todo-${DateTime.now().millisecondsSinceEpoch}',
   'title': 'Buy groceries',
-  'is_completed': 0,
+  'isCompleted': 0,
 });
 
-// Read
-final todos = await db.query('todos',
-  where: 'is_completed = ?',
-  whereArgs: [0],
-);
+// Query data
+List<Map<String, dynamic>> todos = await db.query('todos');
 
-// Update
-await db.update('todos',
-  {'is_completed': 1},
+// Update data
+await db.update(
+  'todos',
+  {'isCompleted': 1},
   where: 'id = ?',
-  whereArgs: ['todo-123'],
+  whereArgs: [1],
 );
 
-// Delete
-await db.delete('todos',
-  where: 'id = ?',
-  whereArgs: ['todo-123'],
-);
+// Delete data
+await db.delete('todos', where: 'id = ?', whereArgs: [1]);
+
+// Watch database changes
+final stream = db.watch('SELECT * FROM todos');
+stream.listen((event) {
+  print(event);
+});
 ```
 
-### Watch for Changes
+Read more: [PocketSync Database](https://docs.pocketsync.dev/pocket-sync/database)
+
+### 3. Manual sync control
 
 ```dart
-// Watch all todos
-final todosStream = db.watch('SELECT * FROM todos');
+// Manually trigger sync
+await PocketSync.instance.scheduleSync();
 
-// Use in StreamBuilder
-StreamBuilder<List<Map<String, dynamic>>>(
-  stream: todosStream,
-  builder: (context, snapshot) {
-    if (snapshot.hasData) {
-      return ListView.builder(
-        itemCount: snapshot.data!.length,
-        itemBuilder: (context, index) => TodoItem(todo: snapshot.data![index]),
-      );
-    }
-    return const CircularProgressIndicator();
-  },
-);
-```
+// Pause synchronization
+await PocketSync.instance.stop();
 
-## Advanced Features
-
-### Custom Conflict Resolution
-
-```dart
-class CustomConflictResolver extends ConflictResolver {
-  @override
-  Future<Map<String, dynamic>> resolveConflict(
-    String tableName,
-    Map<String, dynamic> localData,
-    Map<String, dynamic> remoteData,
-  ) async {
-    if (tableName == 'todos') {
-      return {
-        ...remoteData,
-        'title': '${localData['title']} (merged)',
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-      };
-    }
-    return remoteData; // Default to last-write-wins
-  }
-}
-
-// Register your custom resolver
-await PocketSync.instance.setConflictResolver(CustomConflictResolver());
-```
-
-### Sync Control
-
-```dart
-// Start sync
+// Resume synchronization
 await PocketSync.instance.start();
+```
 
-// Pause sync
-await PocketSync.instance.pause();
+### 4. Conflict resolution
 
-// Clean up resources
+PocketSync provides several strategies for resolving conflicts:
+
+- **Last Write Wins**: The most recent change based on timestamp wins (default)
+- **Server Wins**: Server changes always take precedence
+- **Client Wins**: Local changes always take precedence
+- **Custom**: Provide your own conflict resolution logic
+
+```dart
+// Using a custom conflict resolver
+await PocketSync.initialize(
+  options: PocketSyncOptions(
+    // ... other options
+    conflictResolutionStrategy: ConflictResolutionStrategy.custom,
+    customResolver: (localChange, remoteChange) async {
+      // Your custom logic to decide which change wins
+      return localChange.timestamp > remoteChange.timestamp
+          ? localChange
+          : remoteChange;
+    },
+  ),
+  // ... database options
+);
+```
+
+### 5. Advanced usage
+
+#### User authentication
+
+Set the user ID for multi-user scenarios:
+
+```dart
+PocketSync.instance.setUserId('user123');
+```
+
+#### Reset sync state
+
+Clear all sync tracking data (use with caution):
+
+```dart
+await PocketSync.instance.reset();
+```
+
+> **Note:** Call `PocketSync.instance.reset()` before calling `PocketSync.instance.start()` to reset the sync engine (for existing apps. Be cautious when using this method as it will clear all change tracking data). It runs once per plugin version (the goal is to provide a smooth transition for people that were using the sdk prior to version 0.3.0)
+
+### Dispose Resources
+
+Clean up resources when the app is closing:
+
+```dart
 await PocketSync.instance.dispose();
 ```
 
-## Error Handling
+## Migration
 
-```dart
-try {
-  // Your sync operations
-} on NetworkError catch (e) {
-  print('Network error: ${e.message}');
-} on DatabaseError catch (e) {
-  print('Database error: ${e.message}');
-} on ConflictError catch (e) {
-  print('Conflict error: ${e.message}');
-} on SyncError catch (e) {
-  print('General sync error: ${e.message}');
-}
-```
+### From 0.2.0 to 0.3.0
 
-## Best Practices
+- PocketSync now uses SQLite FFI to fix issues with JSON_OBJECT function not being available on some Android devices
+- The implementation uses sqflite_common_ffi and sqlite3_flutter_libs packages to provide a more recent version of SQLite with JSON function support
+- A SqliteFfiHelper class was created to initialize the FFI implementation before database operations
+- Call `PocketSync.instance.reset()` before calling `PocketSync.instance.start()` to reset the sync engine.
 
-### Use UUIDs Instead of Integer IDs
+## Best practices
 
-When designing your database schema for use with PocketSync, it's crucial to use UUIDs (or similar globally unique identifiers) instead of auto-incrementing integer IDs for your primary keys. Here's why:
+1. **Initialize early**: Initialize PocketSync during app startup
+2. **Handle conflicts**: Choose an appropriate conflict resolution strategy for your app
+3. **Batch operations**: Group related database operations to optimize sync performance
+4. **User authentication**: Set the user ID when the user logs in (sync will not work without a user ID)
 
-- **Avoid Data Loss**: Auto-incrementing IDs can cause conflicts when syncing data from multiple devices, potentially leading to data loss or incorrect relationships.
-- **Prevent Collisions**: UUIDs virtually eliminate the risk of ID collisions when multiple devices create records offline.
-- **Simplify Conflict Resolution**: Unique IDs make it easier to track and merge changes from different sources.
+## Support
 
-Example of recommended schema and ID usage:
+If you have any questions or need help, please open an issue on the [GitHub repository](https://github.com/pocketsync/pocketsync_flutter). 
 
-```dart
-// In your database initialization (typically in onCreate)
-await db.execute('''
-  CREATE TABLE todos (
-    id TEXT PRIMARY KEY NOT NULL, // UUID as primary key
-    title TEXT NOT NULL,
-    is_completed INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  )
-''');
-
-// When inserting records
-import 'package:uuid/uuid.dart';
-
-await db.insert('todos', {
-  'id': const Uuid().v4(), // Generates a unique UUID
-  'title': 'Buy groceries',
-  'is_completed': 0,
-  'created_at': DateTime.now().millisecondsSinceEpoch,
-  'updated_at': DateTime.now().millisecondsSinceEpoch,
-});
-```
-
-Key points about the schema:
-- Use `TEXT` type for UUID columns instead of `INTEGER`
-- Always declare the ID column as `NOT NULL` and `PRIMARY KEY`
-- Include `created_at` and `updated_at` timestamps for better sync conflict resolution
-
-## Known Limitations
-
-- The SDK is in early alpha, breaking changes may occur
-- Changes are synced in order of occurrence
-- Service optimization for large-scale production use is ongoing
-
-## Documentation
-
-For complete documentation, visit [docs.pocketsync.dev](https://docs.pocketsync.dev)
-
-## Contributing
-
-PocketSync is in early alpha, and your feedback is invaluable. Feel free to:
-- Report issues
-- Suggest features
-- Submit pull requests
+If you need to talk to the PocketSync team, please reach out to [hello@pocketsync.dev](mailto:hello@pocketsync.dev).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://x.com/nossesteve">Steve NOSSE</a>
-</p>
+This project is licensed under the MIT License - see the LICENSE file for details.

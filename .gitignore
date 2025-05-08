@@ -34,3 +34,7 @@ build/
 
 # FVM Version Cache
 .fvm/
+
+.fvmrc
+
+.cxx
