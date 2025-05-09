@@ -11,7 +11,6 @@ import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/engine/sync_scheduler.dart';
 import 'package:pocketsync_flutter/src/engine/sync_worker.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// Coordinates the overall synchronization process.
 ///
