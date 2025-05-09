@@ -1,5 +1,9 @@
+## 0.4.2
+- Fix: Server connection was not properly initialized
+
 ## 0.4.1
 - Fix: Provide missing classes from sqflite
+- Fix: Socket.io client was not properly initialized
 
 ## 0.4.0
 - Split changes into batches to prevent server overload

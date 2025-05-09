@@ -356,9 +356,10 @@ class SchemaManager {
 
       final storedVersion = result.first['version'] as String;
       return storedVersion != currentVersion;
-    } catch (e) {
+    } on DatabaseException catch (e) {
+      // If there's an error (likely because the table doesn't exist yet),
+      // assume reset is needed
       Logger.log('SchemaManager: Error checking version: $e');
-      // If there's an error, assume reset is needed
       return true;
     }
   }
@@ -417,10 +418,8 @@ class SchemaManager {
       await db.transaction((txn) async {
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_device_state');
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_changes');
-
+        await txn.execute('DROP TABLE IF EXISTS __pocketsync_processed_tables');
         await txn.execute('DROP TABLE IF EXISTS __pocketsync_version');
-        await txn
-            .execute('DROP TABLE IF EXISTS __pocketsync_processed_changes');
       });
 
       await initializePocketSyncTables(db);

@@ -64,7 +64,7 @@ class PocketSyncEngine {
     final deviceFingerprint =
         await _deviceFingerprintProvider.getDeviceFingerprint(deviceInfo);
 
-    await schemaManager.registerDevice(database.database, deviceFingerprint);
+    await schemaManager.registerDevice(database, deviceFingerprint);
 
     _apiClient
       ..setupClient(options, deviceFingerprint)
@@ -72,7 +72,7 @@ class PocketSyncEngine {
           await _deviceFingerprintProvider.getDeviceData(deviceInfo));
 
     // Process pre-existing data if enabled
-    await schemaManager.syncPreExistingData(database.database, options);
+    await schemaManager.syncPreExistingData(database, options);
 
     // Initialize components
     _syncQueue = SyncQueue();
@@ -167,9 +167,7 @@ class PocketSyncEngine {
   /// This method must be called to reset the engine.
   /// Be cautious when using this method as it will clear all change tracking data.
   Future<void> reset() async {
-    if (!_isInitialized) return;
-
-    schemaManager.reset(database.database);
+    await schemaManager.reset(database);
   }
 
   /// Disposes of resources used by the sync engine.

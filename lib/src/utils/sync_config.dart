@@ -9,5 +9,5 @@ class SyncConfig {
   static const String defaultGlobalIdColumnName = 'ps_global_id';
 
   /// Plugin version.
-  static const String pluginVersion = '0.3.0';
+  static const String pluginVersion = '0.4.2';
 }

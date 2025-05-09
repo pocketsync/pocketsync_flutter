@@ -14,6 +14,7 @@ class PocketSyncNetworkClient {
 
   String? _deviceId;
   String? _userId;
+  String? _projectId;
 
   PocketSyncNetworkClient({
     required String baseUrl,
@@ -41,6 +42,8 @@ class PocketSyncNetworkClient {
       'x-project-id': options.projectId,
       'x-device-id': deviceId,
     });
+
+    _projectId = options.projectId;
   }
 
   void setDeviceInfos(Map<String, dynamic> deviceInfos) {
@@ -90,10 +93,12 @@ class PocketSyncNetworkClient {
       _socket!.connect();
 
       // Listen for connection events
+
       _socket!.onConnect((_) {
         _socket!.emit('subscribe', {
           'userId': _userId,
           'deviceId': _deviceId,
+          'projectId': _projectId,
           'since': since?.millisecondsSinceEpoch,
         });
 

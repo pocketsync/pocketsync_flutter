@@ -81,9 +81,7 @@ class PocketSync {
   ///
   /// This method must be called to reset the engine.
   /// Be cautious when using this method as it will clear all change tracking data.
-  Future<void> reset() async {
-    _instance._engine.reset();
-  }
+  Future<void> reset() async => await _instance._engine.reset();
 
   /// Disposes of the PocketSync instance.
   ///
