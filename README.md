@@ -1,9 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="logo_full-dark.svg">
-    <img src="logo_full.svg" alt="PocketSync Logo" width="200">
-  </picture>
-  <p align="center">Seamless SQLite synchronization for Flutter applications</p>
+  <img src="https://raw.githubusercontent.com/pocketsync/pocketsync_flutter/refs/heads/main/banner.png" alt="PocketSync Logo" />
 </p>
 
 <p align="center">
@@ -164,11 +160,13 @@ await PocketSync.initialize(
 
 #### User authentication
 
-Set the user ID for multi-user scenarios:
+Set the user ID:
 
 ```dart
 PocketSync.instance.setUserId('user123');
 ```
+
+Note that this is required for sync to actually work. On the server side, the user ID is used to identify the user and their data.
 
 #### Reset sync state
 

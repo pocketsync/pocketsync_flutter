@@ -1,4 +1,5 @@
-export 'package:sqflite/sqflite.dart' show getDatabasesPath, ConflictAlgorithm, inMemoryDatabasePath;
+export 'package:sqflite/sqflite.dart'
+    show getDatabasesPath, ConflictAlgorithm, inMemoryDatabasePath;
 export 'src/pocket_sync.dart';
 export 'src/database/pocket_sync_database.dart';
 export 'src/models/types.dart'

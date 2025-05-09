@@ -772,8 +772,7 @@ void main() {
         when(() => mockSyncQueue.addLocalChange(any(), any()))
             .thenAnswer((_) => '');
 
-        db.execute(
-            '''
+        db.execute('''
 INSERT INTO __pocketsync_changes (table_name, operation, record_rowid, id, data, timestamp, version, synced)
 VALUES ("test_table", "insert", 1, "change_id_1", '{"id": 1, "name": "test"}', 1, 1, 0)
 ''');

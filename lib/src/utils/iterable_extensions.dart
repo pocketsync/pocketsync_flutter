@@ -1,5 +1,6 @@
 extension IterableExtensions<T> on Iterable<T> {
-  Map<K, V> groupBy<K, V>(K Function(T element) key, V Function(T element) value) {
+  Map<K, V> groupBy<K, V>(
+      K Function(T element) key, V Function(T element) value) {
     return fold(
       <K, V>{},
       (map, element) {
