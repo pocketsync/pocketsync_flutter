@@ -31,6 +31,8 @@ class DeviceFingerprintProvider {
         iosInfo.utsname.machine,
         iosInfo.utsname.nodename,
       ]);
+    } else if (Platform.isMacOS || Platform.isWindows) {
+      // TODO: add device mac address
     } else {
       throw UnsupportedError('Unsupported platform');
     }

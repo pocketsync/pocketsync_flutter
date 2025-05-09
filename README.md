@@ -16,7 +16,7 @@
 
 PocketSync enables seamless data synchronization across devices without managing your own backend infrastructure. It works with SQLite databases and handles all the complexities of data synchronization for you.
 
-> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. Features and APIs are quite stable now, but may change without notice.
+> **Note:** PocketSync is currently in alpha. The system is under active development and should not be considered reliable for production use. We are still yet to test it in production like conditions.
 
 ## Features
 

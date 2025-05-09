@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 
 import 'package:pocketsync_flutter/src/engine/pocket_sync_network_client.dart';
 
@@ -40,6 +41,7 @@ class ConnectivityMonitor {
   /// This method is called when connectivity changes. If the device transitions
   /// from offline to online, it triggers the onConnected callback.
   void _handleConnectivityChange(bool isConnected) {
+    Logger.log('ConnectivityMonitor: Connectivity changed to $isConnected');
     final wasConnected = _isConnected;
     _isConnected = isConnected;
 

@@ -10,19 +10,23 @@ class RemoteChangeListener extends ChangeListener {
   final DateTime since;
   final SyncScheduler _syncScheduler;
   final PocketSyncNetworkClient _apiClient;
+  final void Function() onServerConnected;
   StreamSubscription<SyncNotification>? _subscription;
 
   RemoteChangeListener({
     required SyncScheduler syncScheduler,
     required PocketSyncNetworkClient apiClient,
     required this.since,
+    required this.onServerConnected,
   })  : _syncScheduler = syncScheduler,
         _apiClient = apiClient;
 
   @override
   void startListening() {
     final notificationStream = _apiClient.listenForRemoteChanges(
-        since: since, onServerConnected: _onServerConnected);
+      since: since,
+      onServerConnected: onServerConnected,
+    );
     _subscription = notificationStream.listen(_onRemoteChange);
   }
 
@@ -37,10 +41,6 @@ class RemoteChangeListener extends ChangeListener {
     _subscription?.cancel();
     _subscription = null;
     _apiClient.stopListening();
-  }
-
-  void _onServerConnected() {
-    _syncScheduler.forceSyncNow();
   }
 
   @override

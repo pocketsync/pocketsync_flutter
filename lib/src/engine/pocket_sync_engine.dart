@@ -106,11 +106,18 @@ class PocketSyncEngine {
       syncScheduler: _syncScheduler,
       apiClient: _apiClient,
       since: await _syncWorker.getLastDownloadTimestamp(),
+      onServerConnected: () async {
+        final hasChanges = await _syncWorker.warmUp();
+        if (hasChanges) {
+          await _syncScheduler.forceSyncNow();
+        }
+      },
     );
 
-    // Start listening for database changes
     _databaseChangeListener.startListening();
     _remoteChangeListener.startListening();
+
+    _syncWorker.start();
 
     _isInitialized = true;
   }

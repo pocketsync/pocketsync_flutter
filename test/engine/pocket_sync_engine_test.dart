@@ -172,6 +172,10 @@ void main() {
 
     group('bootstrap', () {
       test('should initialize all components correctly', () async {
+        when(() => mockApiClient.isServerReachable()).thenReturn(true);
+        when(() => mockApiClient.connectionStream)
+            .thenAnswer((_) => Stream.value(true));
+
         // Act
         await engine.bootstrap();
 
@@ -186,6 +190,9 @@ void main() {
       });
 
       test('should not initialize twice', () async {
+        when(() => mockApiClient.isServerReachable()).thenReturn(true);
+        when(() => mockApiClient.connectionStream)
+            .thenAnswer((_) => Stream.value(true));
         // Arrange
         await engine.bootstrap();
 

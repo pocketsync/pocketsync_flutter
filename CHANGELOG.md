@@ -2,6 +2,7 @@
 - Split changes into batches to prevent server overload
 - Properly handle connection and disconnection events (and avoid unnecessary syncs)
 - Add support for in memory database
+- Trigger sync on app startup if there are changes to sync
 
 ## 0.3.0
 - Complete refactoring of the engine

@@ -252,9 +252,7 @@ class PocketSyncNetworkClient {
   }
 
   /// Gets the current connection status based on socket connection.
-  bool isServerReachable() {
-    return _isConnected;
-  }
+  bool isServerReachable() => _isConnected;
 
   /// Gets a stream of connection status updates.
   ///

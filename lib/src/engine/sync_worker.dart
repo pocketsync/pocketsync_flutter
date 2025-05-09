@@ -11,6 +11,7 @@ import 'package:pocketsync_flutter/src/engine/sync_batch_processor.dart';
 import 'package:pocketsync_flutter/src/engine/sync_queue.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
+import 'package:pocketsync_flutter/src/utils/iterable_extensions.dart';
 import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 import 'package:sqflite/sqflite.dart';
@@ -33,8 +34,6 @@ class SyncWorker {
 
   bool _isRunning = false;
   bool _isSyncing = false;
-  Timer? _syncTimer;
-  final Duration _syncInterval;
 
   /// Creates a new SyncWorker.
   ///
@@ -48,7 +47,6 @@ class SyncWorker {
     required Database database,
     required MergeEngine mergeEngine,
     required SchemaManager schemaManager,
-    Duration? syncInterval,
     int? maxBatchSize,
     DatabaseWatcher? databaseWatcher,
     ConnectivityMonitor? connectivityMonitor,
@@ -58,7 +56,6 @@ class SyncWorker {
         _database = database,
         _mergeEngine = mergeEngine,
         _schemaManager = schemaManager,
-        _syncInterval = syncInterval ?? const Duration(minutes: 5),
         _databaseWatcher = databaseWatcher ?? DatabaseWatcher() {
     // Initialize the connectivity monitor
     _connectivityMonitor = connectivityMonitor ??
@@ -90,13 +87,6 @@ class SyncWorker {
 
     // Process the queue immediately when starting
     await processQueue();
-
-    // Set up periodic sync
-    _syncTimer = Timer.periodic(_syncInterval, (_) async {
-      if (!_isSyncing) {
-        await processQueue();
-      }
-    });
   }
 
   /// Stops the sync worker.
@@ -105,8 +95,6 @@ class SyncWorker {
   Future<void> stop() async {
     if (!_isRunning) return;
 
-    _syncTimer?.cancel();
-    _syncTimer = null;
     _isRunning = false;
   }
 
@@ -121,7 +109,6 @@ class SyncWorker {
 
   /// Disposes of resources used by the sync worker.
   void dispose() {
-    _syncTimer?.cancel();
     _connectivityMonitor.dispose();
   }
 
@@ -376,5 +363,22 @@ class SyncWorker {
       winningChange,
       syncSessionId,
     );
+  }
+
+  Future<bool> warmUp() async {
+    final pendingChanges = await _database.rawQuery(
+      'SELECT DISTINCT table_name, operation, record_rowid, id, data, timestamp, version, synced FROM __pocketsync_changes WHERE synced = 0',
+    );
+
+    final changes = SyncChange.fromDatabaseRecords(pendingChanges);
+    // group changes by table
+    final groupedChanges = changes.groupBy((c) => c.tableName, (c) => c);
+    for (final entry in groupedChanges.entries) {
+      _syncQueue.addLocalChange(entry.key, entry.value.operation);
+    }
+    if (_syncQueue.isEmpty) {
+      return false;
+    }
+    return true;
   }
 }

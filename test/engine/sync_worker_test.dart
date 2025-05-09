@@ -178,8 +178,6 @@ void main() {
         mergeEngine: mockMergeEngine,
         schemaManager: mockSchemaManager,
         databaseWatcher: mockDatabaseWatcher,
-        // Use a very short sync interval for testing
-        syncInterval: const Duration(milliseconds: 100),
         connectivityMonitor: ConnectivityMonitor(
           networkClient: mockApiClient,
           onConnected: () {},
@@ -270,7 +268,6 @@ void main() {
           mergeEngine: mockMergeEngine,
           schemaManager: mockSchemaManager,
           databaseWatcher: mockDatabaseWatcher,
-          syncInterval: const Duration(milliseconds: 100),
         );
 
         // Replace the internal connectivity monitor and batch processor with mocks
@@ -744,6 +741,48 @@ void main() {
         verify(() => mockApiClient.downloadChanges(since: any(named: 'since')))
             .called(1);
         verify(() => mockSyncQueue.markDownloadProcessed()).called(1);
+      });
+    });
+
+    group('warmUp', () {
+      setUp(() {
+        registerFallbackValue(ChangeType.insert);
+      });
+
+      test('nothing is added to the queue if there are no pending changes',
+          () async {
+        // Arrange
+        when(() => mockSyncQueue.isEmpty).thenReturn(true);
+        when(() => mockSyncQueue.hasDownloads).thenReturn(false);
+        when(() => mockSyncQueue.addLocalChange(any(), any()))
+            .thenAnswer((_) => '');
+
+        // Act
+        await syncWorker.warmUp();
+
+        // Assert
+        verifyNever(() => mockSyncQueue.addLocalChange(any(), any()));
+      });
+
+      test('something is added to the queue if there are pending changes',
+          () async {
+        // Arrange
+        when(() => mockSyncQueue.isEmpty).thenReturn(false);
+        when(() => mockSyncQueue.hasDownloads).thenReturn(false);
+        when(() => mockSyncQueue.addLocalChange(any(), any()))
+            .thenAnswer((_) => '');
+
+        db.execute(
+            '''
+INSERT INTO __pocketsync_changes (table_name, operation, record_rowid, id, data, timestamp, version, synced)
+VALUES ("test_table", "insert", 1, "change_id_1", '{"id": 1, "name": "test"}', 1, 1, 0)
+''');
+
+        // Act
+        await syncWorker.warmUp();
+
+        // Assert
+        verify(() => mockSyncQueue.addLocalChange(any(), any())).called(1);
       });
     });
   });
