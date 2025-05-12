@@ -76,6 +76,9 @@ Future<void> initPocketSync() async {
       },
     ),
   );
+
+  // Authenticate
+  PocketSync.instance.setUserId('my-user-id');
   
   // Start the sync engine
   await PocketSync.instance.start();
