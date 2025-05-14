@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
-import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Utility class for database testing that provides common setup and teardown
@@ -42,24 +41,17 @@ class DatabaseTestUtils {
     return DatabaseOptions(
       version: 1,
       dbPath: inMemoryDatabasePath,
-      onCreate: (db, version) async {
-        // Create a test table
-        await db.execute('''
-          CREATE TABLE users (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT
-          )
-        ''');
-      },
+      schema: DatabaseSchema(tables: [
+        TableSchema(
+          name: 'users',
+          columns: [
+            TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+            TableColumn.text(name: 'name', isNullable: false),
+            TableColumn.text(name: 'email'),
+          ],
+        ),
+      ]),
     );
-  }
-
-  /// Creates a SchemaManager instance for testing.
-  ///
-  /// Returns a new SchemaManager instance.
-  static SchemaManager createSchemaManager() {
-    return SchemaManager();
   }
 
   /// Inserts test data into the users table.

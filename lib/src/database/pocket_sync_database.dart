@@ -5,16 +5,24 @@ import 'package:pocketsync_flutter/src/database/pocket_sync_batch.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_transaction.dart';
 import 'package:pocketsync_flutter/src/database/query_watcher.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
+
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:pocketsync_flutter/src/utils/sql_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// A database instance that extends [DatabaseExecutor] and provides additional
-
+/// functionality for PocketSync.
+///
+/// This class manages a SQLite database with schema support and change tracking.
 class PocketSyncDatabase extends DatabaseExecutor {
   Database? _db;
+
   final SchemaManager _schemaManager;
 
+  /// Creates a new PocketSync database instance.
+  ///
+  /// [schemaManager] The schema manager to use for managing the database schema.
+  /// If a schema is provided in the database options, it will be passed to this schema manager.
   PocketSyncDatabase({required SchemaManager schemaManager})
       : _schemaManager = schemaManager;
 
@@ -26,14 +34,15 @@ class PocketSyncDatabase extends DatabaseExecutor {
   @override
   Database get database => _db!;
 
-  /// Initializes the database.
+  /// Initializes the database with the provided options and schema.
   ///
   /// This method must be called before using any other database methods.
   ///
-  /// [options] The configuration options for the database.
-  /// [databaseWatcher] The database watcher to be used for change notifications.
+  /// [options] The database options, including optional schema definition.
+  /// [databaseWatcher] The watcher for database changes.
   Future<void> initialize(
       DatabaseOptions options, DatabaseWatcher databaseWatcher) async {
+
     _db = await databaseFactory.openDatabase(
       options.dbPath,
       options: OpenDatabaseOptions(
@@ -45,23 +54,32 @@ class PocketSyncDatabase extends DatabaseExecutor {
         onCreate: (db, version) async {
           await _schemaManager.initializePocketSyncTables(db);
 
-          await options.onCreate(db, version);
+          // If onCreate is provided, call it, otherwise the schema will be used by the SchemaManager
+          if (options.onCreate != null) {
+            await options.onCreate?.call(db, version);
+          }
           await _schemaManager.setupChangeTracking(db);
         },
         onDowngrade: (db, oldVersion, newVersion) async {
-          await options.onDowngrade?.call(db, oldVersion, newVersion);
+          if (options.onDowngrade != null) {
+            await options.onDowngrade?.call(db, oldVersion, newVersion);
+          }
 
           await _schemaManager.handleSchemaChanges(db);
           await _schemaManager.setupChangeTracking(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          await options.onUpgrade?.call(db, oldVersion, newVersion);
+          if (options.onUpgrade != null) {
+            await options.onUpgrade?.call(db, oldVersion, newVersion);
+          }
 
           await _schemaManager.handleSchemaChanges(db);
           await _schemaManager.setupChangeTracking(db);
         },
         onOpen: (db) async {
-          await options.onOpen?.call(db);
+          if (options.onOpen != null) {
+            await options.onOpen?.call(db);
+          }
 
           await _schemaManager.initializePocketSyncTables(db);
           await _schemaManager.setupChangeTracking(db);

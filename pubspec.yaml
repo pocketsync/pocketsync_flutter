@@ -25,6 +25,7 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.32
   socket_io_client: ^3.1.2
   uuid: ^4.5.1
+  collection: ^1.19.1
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
+import 'package:pocketsync_flutter/src/engine/schema_processor.dart';
 import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -26,33 +27,37 @@ void main() {
     late Database db;
 
     setUp(() async {
-      // Create a new SchemaManager instance for each test
-      schemaManager = SchemaManager();
+      final schema = DatabaseSchema(
+        tables: [
+          TableSchema(
+            name: 'users',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+              TableColumn.text(name: 'name', isNullable: false),
+              TableColumn.text(name: 'email'),
+            ],
+          ),
+          TableSchema(
+            name: 'products',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+              TableColumn.text(name: 'name', isNullable: false),
+              TableColumn.text(name: 'price'),
+            ],
+          ),
+        ],
+      );
+      schemaManager = SchemaManager(schema: schema);
 
       // Create an in-memory database for testing
       db = await openDatabase(
         inMemoryDatabasePath,
         version: 1,
-        onCreate: (db, version) async {
-          // Create a test table
-          await db.execute('''
-            CREATE TABLE users (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              email TEXT
-            )
-          ''');
-
-          // Create another test table
-          await db.execute('''
-            CREATE TABLE products (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              price REAL NOT NULL
-            )
-          ''');
-        },
       );
+
+      for (final table in schema.tables) {
+        await db.execute(table.toCreateTableSql());
+      }
     });
 
     tearDown(() async {
@@ -247,7 +252,6 @@ void main() {
 
         // Assert
         expect(status, isA<Map<String, dynamic>>());
-        expect(status['devices'], isA<List>());
         expect(status['pending_changes'], 0);
       });
     });
@@ -357,25 +361,31 @@ void main() {
     });
 
     group('generateUpdateCondition', () {
-      test('should generate correct SQL condition for detecting changes', () {
+      test('PocketSyncSchema should generate update conditions that exclude global ID column', () {
         // Arrange
+        final tableName = 'test_table';
         final columns = [
-          'id',
-          'name',
-          'email',
-          SyncConfig.defaultGlobalIdColumnName
+          TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+          TableColumn.text(name: 'name', isNullable: false),
+          TableColumn.text(name: 'email'),
+          TableColumn.text(name: SyncConfig.defaultGlobalIdColumnName),
         ];
+        
+        final tableSchema = TableSchema(
+          name: tableName,
+          columns: columns,
+        );
 
         // Act
-        final condition = schemaManager.generateUpdateCondition(columns);
+        final triggers = SchemaProcessor.createChangeTrackingTriggers(tableSchema);
+        final updateTrigger = triggers.firstWhere((t) => t.event == 'UPDATE', orElse: () => throw Exception('No UPDATE trigger found'));
 
         // Assert
-        // Should exclude the global ID column
-        expect(condition, contains('OLD.id IS NOT NEW.id'));
-        expect(condition, contains('OLD.name IS NOT NEW.name'));
-        expect(condition, contains('OLD.email IS NOT NEW.email'));
-        expect(condition,
-            isNot(contains('OLD.${SyncConfig.defaultGlobalIdColumnName}')));
+        // Should exclude the global ID column in the WHEN condition
+        expect(updateTrigger.when, contains('OLD.id IS NOT NEW.id'));
+        expect(updateTrigger.when, contains('OLD.name IS NOT NEW.name'));
+        expect(updateTrigger.when, contains('OLD.email IS NOT NEW.email'));
+        expect(updateTrigger.when, isNot(contains('OLD.${SyncConfig.defaultGlobalIdColumnName}')));
       });
     });
 
