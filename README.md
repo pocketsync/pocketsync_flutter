@@ -27,7 +27,7 @@ PocketSync enables seamless data synchronization across devices without managing
 
 ```yaml
 dependencies:
-  pocketsync_flutter: ^0.5.0
+  pocketsync_flutter: latest
 ```
 
 Then run:
