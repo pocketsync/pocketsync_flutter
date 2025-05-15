@@ -64,7 +64,16 @@ class SchemaManager {
   ///
   /// This method creates tables and indexes based on the schema definition.
   /// It also adds change tracking support to tables that need it.
+  /// 
+  /// Validates the schema before creating tables and throws an exception if
+  /// the schema is invalid.
   Future<void> createTablesFromSchema(Database db) async {
+    // Validate the schema first
+    if (!SchemaProcessor.validateSchema(_schema)) {
+      Logger.log('Schema validation failed. Please check your schema definition.');
+      throw Exception('Schema validation failed. See logs for details.');
+    }
+    
     // Add change tracking to the schema
     final schemaWithTracking = SchemaProcessor.addChangeTracking(_schema);
 
@@ -105,71 +114,107 @@ class SchemaManager {
     // Wrap in transaction for atomicity
     await db.transaction((txn) async {
       // Create changes tracking table
-      await txn.execute('''
-        CREATE TABLE IF NOT EXISTS __pocketsync_changes (
-          id TEXT PRIMARY KEY,
-          table_name TEXT NOT NULL,
-          record_rowid TEXT NOT NULL,
-          operation TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          data TEXT NOT NULL,
-          version INTEGER NOT NULL,
-          synced INTEGER DEFAULT 0
-        );
-
-        -- Create indexes for optimizing queries
-        CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_synced ON __pocketsync_changes(synced);
-        CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_version ON __pocketsync_changes(version);
-        CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_timestamp ON __pocketsync_changes(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_table_name ON __pocketsync_changes(table_name);
-        CREATE INDEX IF NOT EXISTS idx_pocketsync_changes_record_rowid ON __pocketsync_changes(record_rowid)
-      ''');
-
-      // Create device state tracking table
-      await txn.execute('''
-        CREATE TABLE IF NOT EXISTS __pocketsync_device_state (
-          device_id TEXT PRIMARY KEY,
-          last_upload_timestamp INTEGER NULL,
-          last_download_timestamp INTEGER NULL,
-          last_sync_status TEXT NULL,
-          last_cleanup_timestamp INTEGER NULL
-        )
-      ''');
-
-      // Create version tracking table
-      await txn.execute('''
-        CREATE TABLE IF NOT EXISTS __pocketsync_version (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          version TEXT NOT NULL,
-          last_reset_timestamp INTEGER NOT NULL
-        )
-      ''');
-
-      // Create table for tracking pre-existing data processing
-      await txn.execute('''
-        CREATE TABLE IF NOT EXISTS __pocketsync_processed_tables (
-          table_name TEXT PRIMARY KEY,
-          processed_at INTEGER NOT NULL
-        )
-      ''');
+      final internalTablesSchema = SchemaProcessor.getInternalTablesSchema();
+      for (final table in internalTablesSchema.tables) {
+        await txn.execute(table.toCreateTableSql());
+        for (final index in table.toCreateIndexSql()) {
+          await txn.execute(index);
+        }
+      }
     });
   }
 
-  /// Handles schema changes by recreating tables if needed.
+  /// Handles schema changes by creating missing tables, adding missing columns, and recreating triggers.
+  ///
+  /// This method compares the current database schema with the expected schema
+  /// and makes necessary changes to align them, such as creating missing tables,
+  /// adding missing columns, and recreating triggers.
+  /// 
+  /// Validates the schema before making any changes and throws an exception if
+  /// the schema is invalid.
   Future<void> handleSchemaChanges(Database db) async {
+    // Validate the schema first
+    if (!SchemaProcessor.validateSchema(_schema)) {
+      Logger.log('Schema validation failed. Please check your schema definition.');
+      throw Exception('Schema validation failed. See logs for details.');
+    }
+    
+    final schemaWithTracking = SchemaProcessor.addChangeTracking(_schema);
+    
+    // First, check if we need to create any tables that don't exist yet
+    final existingTables = await _getUserTables(db);
+    
+    // Create any tables that exist in the schema but not in the database
+    for (final tableSchema in schemaWithTracking.tables) {
+      if (!existingTables.contains(tableSchema.name) && !tableSchema.isInternalTable) {
+        Logger.log('Creating missing table ${tableSchema.name}');
+        await db.execute(_generateCreateTableSql(tableSchema));
+        
+        // Create indexes for the new table
+        for (final index in tableSchema.indexes) {
+          await db.execute(_generateCreateIndexSql(tableSchema.name, index));
+        }
+      }
+    }
+    
+    // Now handle schema changes for existing tables
     final tables = await _getUserTables(db);
-
+    
     for (final tableName in tables) {
       await db.transaction((txn) async {
         try {
+          // Get the expected schema for this table
+          final tableSchema = schemaWithTracking.getTable(tableName);
+          
+          // If this table isn't in our schema definition, just update triggers
+          if (tableSchema == null) {
+            Logger.log('Table $tableName not found in schema, updating triggers only');
+            await _createTableTriggers(txn, tableName);
+            return; // Skip the rest of this iteration
+          }
+          
+          // Get current columns in the database
+          final existingColumns = await _getTableColumns(txn, tableName);
+          
+          // Add missing columns
+          for (final column in tableSchema.columns) {
+            if (!existingColumns.contains(column.name)) {
+              Logger.log('Adding missing column ${column.name} to $tableName');
+              
+              // Generate the ALTER TABLE statement
+              final alterSql = 'ALTER TABLE $tableName ADD COLUMN ${column.toSql()}';
+              await txn.execute(alterSql);
+              
+              // If this is a non-nullable column with a default value, update existing rows
+              if (!column.isNullable && column.defaultValue != null) {
+                final defaultValueSql = _getSqlValueForDefaultValue(column.defaultValue);
+                await txn.execute(
+                  'UPDATE $tableName SET ${column.name} = $defaultValueSql WHERE ${column.name} IS NULL'
+                );
+              }
+            }
+          }
+          
+          // Create any missing indexes
+          for (final index in tableSchema.indexes) {
+            final indexName = 'idx_${tableName}_${index.columns.join('_')}';
+            if (!await _indexExists(txn, indexName)) {
+              Logger.log('Creating missing index $indexName for $tableName');
+              await txn.execute(index.toSql(tableName));
+            }
+          }
+          
           // This will recreate triggers with current schema
           await _createTableTriggers(txn, tableName);
         } catch (e) {
-          Logger.log('Error updating triggers for $tableName: $e');
+          Logger.log('Error handling schema changes for $tableName: $e');
           rethrow;
         }
       });
     }
+    
+    // Ensure PocketSync internal tables exist
+    await initializePocketSyncTables(db);
   }
 
   // Register this device in the sync system
@@ -192,10 +237,6 @@ class SchemaManager {
       );
     }
   }
-
-  // This method is now implemented below
-
-  // These methods are implemented below
 
   /// Disables all change tracking triggers.
   ///
@@ -316,11 +357,11 @@ class SchemaManager {
     final pendingChanges = await db.rawQuery(
         'SELECT COUNT(*) as count FROM __pocketsync_changes WHERE synced = 0');
 
-    return {
+      return {
       'devices': deviceStates,
       'pending_changes': pendingChanges.first['count'],
-    };
-  }
+      };
+    }
 
   /// Gets the primary key column name for a table.
   /// This method is used by the change tracking system to identify records.
@@ -468,14 +509,6 @@ class SchemaManager {
     int timestamp,
   ) async {
     try {
-      // Create table for tracking pre-existing data processing
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS __pocketsync_processed_tables (
-          table_name TEXT PRIMARY KEY,
-          processed_at INTEGER NOT NULL
-        )
-      ''');
-
       // Insert the record
       await db.insert(
         '__pocketsync_processed_tables',
@@ -702,5 +735,33 @@ class SchemaManager {
   /// Generates a CREATE INDEX SQL statement for the given index.
   String _generateCreateIndexSql(String tableName, Index index) {
     return index.toSql(tableName);
+  }
+
+  /// Gets all column names for a table.
+  /// 
+  /// Returns a list of column names in the table.
+  Future<List<String>> _getTableColumns(Transaction txn, String tableName) async {
+    final result = await txn.rawQuery("PRAGMA table_info('$tableName')");
+    return result.map((col) => col['name'] as String).toList();
+  }
+
+  /// Converts a Dart value to its SQL representation for use in queries.
+  /// 
+  /// This is used when setting default values for columns.
+  String _getSqlValueForDefaultValue(dynamic value) {
+    if (value == null) {
+      return 'NULL';
+    } else if (value is String) {
+      // Escape single quotes in strings
+      final escaped = value.replaceAll("'", "''");
+      return "'$escaped'";
+    } else if (value is bool) {
+      return value ? '1' : '0';
+    } else if (value is DateTime) {
+      return value.millisecondsSinceEpoch.toString();
+    } else {
+      // Numbers and other types
+      return value.toString();
+    }
   }
 }

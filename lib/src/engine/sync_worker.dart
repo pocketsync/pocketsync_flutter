@@ -100,8 +100,6 @@ class SyncWorker {
 
   /// Called when connectivity is restored.
   Future<void> _onConnectivityRestored() async {
-    Logger.log('SyncWorker: Connectivity restored, processing queue');
-
     if (!_isSyncing) {
       await processQueue();
     }
@@ -151,10 +149,7 @@ class SyncWorker {
         if (_syncQueue.hasDownloads) {
           await _processDownloads(since: await getLastDownloadTimestamp());
         }
-      } else {
-        Logger.log(
-            'SyncWorker: Server not connected, will sync when connection is restored');
-      }
+      } 
     } finally {
       _isSyncing = false;
     }

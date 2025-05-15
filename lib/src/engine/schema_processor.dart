@@ -1,4 +1,5 @@
 import 'package:pocketsync_flutter/src/models/schema.dart';
+import 'package:pocketsync_flutter/src/utils/logger.dart';
 import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 
 /// Internal class for processing schemas and adding change tracking functionality.
@@ -102,6 +103,92 @@ class SchemaProcessor {
     );
   }
 
+  /// Perform validation on schema to ensure it meets requirements for PocketSync.
+  /// 
+  /// This method checks for common issues in the schema definition that might
+  /// cause problems during synchronization, such as:
+  /// - Tables without primary keys
+  /// - Reserved column names
+  /// - Unsupported column types
+  /// - Naming conflicts with internal tables
+  /// 
+  /// Returns true if the schema is valid, false otherwise.
+  /// Logs specific validation errors to help with debugging.
+  static bool validateSchema(DatabaseSchema schema) {
+    if (schema.tables.isEmpty) {
+      Logger.log('Schema validation failed: No tables defined in schema');
+      return false;
+    }
+    
+    bool isValid = true;
+    final reservedColumnNames = [
+      SyncConfig.defaultGlobalIdColumnName,
+      'id', // Not strictly reserved, but special handling is needed
+      'rowid', // SQLite internal
+      'oid', // SQLite internal
+      '_rowid_', // SQLite internal
+    ];
+    
+    final reservedTablePrefixes = [
+      '__pocketsync',
+      'sqlite_',
+      'android_',
+    ];
+    
+    // Check each user table
+    for (final table in getUserTables(schema)) {
+      // Check for reserved table names
+      for (final prefix in reservedTablePrefixes) {
+        if (table.name.startsWith(prefix)) {
+          Logger.log('Schema validation warning: Table ${table.name} uses reserved prefix $prefix');
+          isValid = false;
+        }
+      }
+      
+      // Check if table has a primary key
+      final hasPrimaryKey = table.columns.any((col) => col.isPrimaryKey);
+      if (!hasPrimaryKey) {
+        Logger.log('Schema validation failed: Table ${table.name} has no primary key');
+        isValid = false;
+      }
+      
+      // Check column names and types
+      for (final column in table.columns) {
+        // Check for reserved column names
+        if (reservedColumnNames.contains(column.name.toLowerCase()) && 
+            column.name != 'id' && // Allow 'id' as it's commonly used as PK
+            column.name != SyncConfig.defaultGlobalIdColumnName) { // Allow global ID if explicitly defined
+          Logger.log('Schema validation warning: Column ${column.name} in table ${table.name} uses reserved name');
+        }
+        
+        // Check for unsupported column types or configurations
+        if (column.type == ColumnType.blob && column.isPrimaryKey) {
+          Logger.log('Schema validation warning: BLOB type not recommended for primary key in ${table.name}.${column.name}');
+        }
+      }
+      
+      // Check for duplicate column names (case insensitive in SQLite)
+      final columnNames = table.columns.map((c) => c.name.toLowerCase()).toList();
+      final uniqueColumnNames = columnNames.toSet().toList();
+      if (columnNames.length != uniqueColumnNames.length) {
+        Logger.log('Schema validation failed: Table ${table.name} has duplicate column names (SQLite is case-insensitive)');
+        isValid = false;
+      }
+      
+      // Check for duplicate index names
+      if (table.indexes.isNotEmpty) {
+        final indexNames = table.indexes.map((i) => i.name.toLowerCase()).toList();
+        final uniqueIndexNames = indexNames.toSet().toList();
+        if (indexNames.length != uniqueIndexNames.length) {
+          Logger.log('Schema validation failed: Table ${table.name} has duplicate index names');
+          isValid = false;
+        }
+      }
+    }
+    
+    return isValid;
+  }
+
   /// Creates the changes tracking table schema.
   /// @nodoc
   static TableSchema _createChangesTable() {
@@ -130,6 +217,14 @@ class SchemaProcessor {
           name: 'timestamp',
           isNullable: false,
         ),
+        TableColumn.text(
+          name: 'data',
+          isNullable: false,
+        ),
+        TableColumn.integer(
+          name: 'version',
+          isNullable: false,
+        ),
         TableColumn.integer(
           name: 'synced',
           isNullable: false,
@@ -137,18 +232,14 @@ class SchemaProcessor {
         ),
       ],
       indexes: [
+        Index(name: 'idx_pocketsync_changes_synced', columns: ['synced']),
+        Index(name: 'idx_pocketsync_changes_version', columns: ['version']),
+        Index(name: 'idx_pocketsync_changes_timestamp', columns: ['timestamp']),
         Index(
-          name: 'idx_pocketsync_changes_table_name',
-          columns: ['table_name'],
-        ),
+            name: 'idx_pocketsync_changes_table_name', columns: ['table_name']),
         Index(
-          name: 'idx_pocketsync_changes_synced',
-          columns: ['synced'],
-        ),
-        Index(
-          name: 'idx_pocketsync_changes_timestamp',
-          columns: ['timestamp'],
-        ),
+            name: 'idx_pocketsync_changes_record_rowid',
+            columns: ['record_rowid']),
       ],
     );
   }
@@ -165,19 +256,20 @@ class SchemaProcessor {
         ),
         TableColumn.integer(
           name: 'last_upload_timestamp',
-          isNullable: false,
+          isNullable: true,
         ),
         TableColumn.integer(
           name: 'last_download_timestamp',
-          isNullable: false,
+          isNullable: true,
         ),
         TableColumn.text(
           name: 'last_sync_status',
           isNullable: false,
+          defaultValue: 'NEVER_SYNCED',
         ),
         TableColumn.integer(
           name: 'last_cleanup_timestamp',
-          isNullable: false,
+          isNullable: true,
         ),
       ],
     );
@@ -221,92 +313,5 @@ class SchemaProcessor {
         ),
       ],
     );
-  }
-
-  /// Creates change tracking triggers for a table.
-  ///
-  /// This method generates SQL triggers for INSERT, UPDATE, and DELETE operations
-  /// on the specified table to track changes for synchronization.
-  /// @nodoc
-  static List<Trigger> createChangeTrackingTriggers(TableSchema table) {
-    if (table.isInternalTable) {
-      return []; // Don't create triggers for internal tables
-    }
-
-    final triggers = <Trigger>[];
-    final tableName = table.name;
-    final columns = table.columns
-        .where((c) => c.name != SyncConfig.defaultGlobalIdColumnName)
-        .toList();
-
-    // INSERT trigger
-    triggers.add(Trigger(
-      name: '${tableName}_after_insert',
-      tableName: tableName,
-      event: 'INSERT',
-      timing: 'AFTER',
-      statements: [
-        '''
-        INSERT INTO __pocketsync_changes 
-        (table_name, record_rowid, operation, timestamp, synced) 
-        VALUES (
-          '$tableName', 
-          NEW.${SyncConfig.defaultGlobalIdColumnName}, 
-          'INSERT', 
-          strftime('%s', 'now') * 1000, 
-          0
-        );
-        '''
-      ],
-    ));
-
-    // UPDATE trigger
-    final whenConditions = columns.map((column) {
-      return 'OLD.${column.name} IS NOT NEW.${column.name}';
-    }).join(' OR ');
-
-    triggers.add(Trigger(
-      name: '${tableName}_after_update',
-      tableName: tableName,
-      event: 'UPDATE',
-      timing: 'AFTER',
-      when: whenConditions,
-      statements: [
-        '''
-        INSERT INTO __pocketsync_changes 
-        (table_name, record_rowid, operation, timestamp, synced) 
-        VALUES (
-          '$tableName', 
-          NEW.${SyncConfig.defaultGlobalIdColumnName}, 
-          'UPDATE', 
-          strftime('%s', 'now') * 1000, 
-          0
-        );
-        '''
-      ],
-    ));
-
-    // DELETE trigger
-    triggers.add(Trigger(
-      name: '${tableName}_after_delete',
-      tableName: tableName,
-      event: 'DELETE',
-      timing: 'AFTER',
-      statements: [
-        '''
-        INSERT INTO __pocketsync_changes 
-        (table_name, record_rowid, operation, timestamp, synced) 
-        VALUES (
-          '$tableName', 
-          OLD.${SyncConfig.defaultGlobalIdColumnName}, 
-          'DELETE', 
-          strftime('%s', 'now') * 1000, 
-          0
-        );
-        '''
-      ],
-    ));
-
-    return triggers;
   }
 }

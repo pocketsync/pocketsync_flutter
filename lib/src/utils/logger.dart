@@ -9,7 +9,7 @@ class Logger {
 
   static void log(String message) {
     if (_enabled && !kReleaseMode) {
-      debugPrint(message);
+      debugPrint('[PocketSync] - $message');
     }
   }
 }

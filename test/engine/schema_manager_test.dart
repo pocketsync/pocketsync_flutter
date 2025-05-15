@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pocketsync_flutter/pocketsync_flutter.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
-import 'package:pocketsync_flutter/src/engine/schema_processor.dart';
 import 'package:pocketsync_flutter/src/utils/sync_config.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -27,6 +26,7 @@ void main() {
     late Database db;
 
     setUp(() async {
+
       final schema = DatabaseSchema(
         tables: [
           TableSchema(
@@ -47,6 +47,7 @@ void main() {
           ),
         ],
       );
+      // Create a new SchemaManager instance for each test
       schemaManager = SchemaManager(schema: schema);
 
       // Create an in-memory database for testing
@@ -57,6 +58,9 @@ void main() {
 
       for (final table in schema.tables) {
         await db.execute(table.toCreateTableSql());
+        for (final index in table.toCreateIndexSql()) {
+          await db.execute(index);
+        }
       }
     });
 
@@ -106,8 +110,6 @@ void main() {
         await schemaManager.initializePocketSyncTables(db);
 
         // Act
-        // Since _getUserTables is private, we can test it indirectly through setupChangeTracking
-        // First, let's query all tables to verify our test setup
         final allTables = await db.query(
           'sqlite_master',
           where: "type = 'table'",
@@ -252,6 +254,7 @@ void main() {
 
         // Assert
         expect(status, isA<Map<String, dynamic>>());
+        expect(status['devices'], isA<List>());
         expect(status['pending_changes'], 0);
       });
     });
@@ -361,31 +364,25 @@ void main() {
     });
 
     group('generateUpdateCondition', () {
-      test('PocketSyncSchema should generate update conditions that exclude global ID column', () {
+      test('should generate correct SQL condition for detecting changes', () {
         // Arrange
-        final tableName = 'test_table';
         final columns = [
-          TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
-          TableColumn.text(name: 'name', isNullable: false),
-          TableColumn.text(name: 'email'),
-          TableColumn.text(name: SyncConfig.defaultGlobalIdColumnName),
+          'id',
+          'name',
+          'email',
+          SyncConfig.defaultGlobalIdColumnName
         ];
-        
-        final tableSchema = TableSchema(
-          name: tableName,
-          columns: columns,
-        );
 
         // Act
-        final triggers = SchemaProcessor.createChangeTrackingTriggers(tableSchema);
-        final updateTrigger = triggers.firstWhere((t) => t.event == 'UPDATE', orElse: () => throw Exception('No UPDATE trigger found'));
+        final condition = schemaManager.generateUpdateCondition(columns);
 
         // Assert
-        // Should exclude the global ID column in the WHEN condition
-        expect(updateTrigger.when, contains('OLD.id IS NOT NEW.id'));
-        expect(updateTrigger.when, contains('OLD.name IS NOT NEW.name'));
-        expect(updateTrigger.when, contains('OLD.email IS NOT NEW.email'));
-        expect(updateTrigger.when, isNot(contains('OLD.${SyncConfig.defaultGlobalIdColumnName}')));
+        // Should exclude the global ID column
+        expect(condition, contains('OLD.id IS NOT NEW.id'));
+        expect(condition, contains('OLD.name IS NOT NEW.name'));
+        expect(condition, contains('OLD.email IS NOT NEW.email'));
+        expect(condition,
+            isNot(contains('OLD.${SyncConfig.defaultGlobalIdColumnName}')));
       });
     });
 
@@ -460,10 +457,5 @@ void main() {
         expect(processedTables.length, 1);
       });
     });
-
-    // Note: We're focusing on real database tests rather than mocks
-    // because mocking complex database interactions can be challenging
-    // and error-prone. For error handling tests, we'd typically use
-    // integration tests or more targeted unit tests of specific methods.
   });
 }
