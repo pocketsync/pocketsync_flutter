@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pocketsync_flutter/src/database/database_watcher.dart';
 import 'package:pocketsync_flutter/src/database/pocket_sync_database.dart';
 import 'package:pocketsync_flutter/src/engine/schema_manager.dart';
+import 'package:pocketsync_flutter/src/models/schema.dart';
 import 'package:pocketsync_flutter/src/models/types.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -27,9 +28,22 @@ void main() {
     late MockDatabaseWatcher mockDatabaseWatcher;
     late SchemaManager schemaManager;
 
+    final schema = DatabaseSchema(
+      tables: [
+        TableSchema(
+          name: 'users',
+          columns: [
+            TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+            TableColumn.text(name: 'name', isNullable: false),
+            TableColumn.text(name: 'email'),
+          ],
+        ),
+      ],
+    );
+
     setUp(() async {
       // Create real SchemaManager and mock DatabaseWatcher
-      schemaManager = SchemaManager();
+      schemaManager = SchemaManager(schema: schema);
       mockDatabaseWatcher = MockDatabaseWatcher();
 
       // Create the PocketSyncDatabase instance
@@ -38,21 +52,19 @@ void main() {
       // Initialize the database with in-memory database
       final options = DatabaseOptions(
         version: 1,
+        schema: schema,
         dbPath: inMemoryDatabasePath,
-        onCreate: (db, version) async {
-          // Create a test table
-          await db.execute('''
-            CREATE TABLE users (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              email TEXT
-            )
-          ''');
-        },
       );
 
       // Initialize the database with our mock watcher
       await pocketSyncDb.initialize(options, mockDatabaseWatcher);
+
+      // Initialize the database with our mock watcher
+      await pocketSyncDb.initialize(options, mockDatabaseWatcher);
+
+      for (final table in schema.tables) {
+        await pocketSyncDb.execute(table.toCreateTableSql());
+      }
 
       // Insert test data
       await pocketSyncDb.insert(
@@ -72,18 +84,12 @@ void main() {
         // Arrange
         final options = DatabaseOptions(
           version: 1,
+          schema: schema,
           dbPath: inMemoryDatabasePath,
-          onCreate: (db, version) async {
-            // Create a test table
-            await db.execute('''
-              CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT
-              )
-            ''');
-          },
         );
+
+        // Act
+        await pocketSyncDb.initialize(options, mockDatabaseWatcher);
 
         // Act
         await pocketSyncDb.initialize(options, mockDatabaseWatcher);

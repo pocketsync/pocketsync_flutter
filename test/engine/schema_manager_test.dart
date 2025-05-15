@@ -26,33 +26,41 @@ void main() {
     late Database db;
 
     setUp(() async {
+      final schema = DatabaseSchema(
+        tables: [
+          TableSchema(
+            name: 'users',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+              TableColumn.text(name: 'name', isNullable: false),
+              TableColumn.text(name: 'email'),
+            ],
+          ),
+          TableSchema(
+            name: 'products',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+              TableColumn.text(name: 'name', isNullable: false),
+              TableColumn.text(name: 'price'),
+            ],
+          ),
+        ],
+      );
       // Create a new SchemaManager instance for each test
-      schemaManager = SchemaManager();
+      schemaManager = SchemaManager(schema: schema);
 
       // Create an in-memory database for testing
       db = await openDatabase(
         inMemoryDatabasePath,
         version: 1,
-        onCreate: (db, version) async {
-          // Create a test table
-          await db.execute('''
-            CREATE TABLE users (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              email TEXT
-            )
-          ''');
-
-          // Create another test table
-          await db.execute('''
-            CREATE TABLE products (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              price REAL NOT NULL
-            )
-          ''');
-        },
       );
+
+      for (final table in schema.tables) {
+        await db.execute(table.toCreateTableSql());
+        for (final index in table.toCreateIndexSql()) {
+          await db.execute(index);
+        }
+      }
     });
 
     tearDown(() async {
@@ -101,8 +109,6 @@ void main() {
         await schemaManager.initializePocketSyncTables(db);
 
         // Act
-        // Since _getUserTables is private, we can test it indirectly through setupChangeTracking
-        // First, let's query all tables to verify our test setup
         final allTables = await db.query(
           'sqlite_master',
           where: "type = 'table'",
@@ -450,10 +456,5 @@ void main() {
         expect(processedTables.length, 1);
       });
     });
-
-    // Note: We're focusing on real database tests rather than mocks
-    // because mocking complex database interactions can be challenging
-    // and error-prone. For error handling tests, we'd typically use
-    // integration tests or more targeted unit tests of specific methods.
   });
 }

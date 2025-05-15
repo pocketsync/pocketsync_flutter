@@ -19,11 +19,24 @@ void main() async {
     ),
     databaseOptions: DatabaseOptions(
       dbPath: path,
-      onCreate: (db, version) async {
-        await db.execute(
-          'CREATE TABLE todos(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, isCompleted INTEGER)',
-        );
-      },
+      schema: DatabaseSchema(
+        tables: [
+          TableSchema(
+            name: 'todos',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.integer),
+              TableColumn.text(name: 'title'),
+              TableColumn.boolean(name: 'isCompleted'),
+            ],
+            indexes: [
+              Index(
+                name: 'idx_todos_title',
+                columns: ['title'],
+              ),
+            ],
+          )
+        ],
+      ),
     ),
   );
 

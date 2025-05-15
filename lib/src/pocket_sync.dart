@@ -25,10 +25,8 @@ class PocketSync {
   PocketSyncDatabase get database => _instance._database;
 
   static final DatabaseWatcher _databaseWatcher = DatabaseWatcher();
-  static final SchemaManager _schemaManager = SchemaManager();
-  final PocketSyncDatabase _database = PocketSyncDatabase(
-    schemaManager: _schemaManager,
-  );
+  late final SchemaManager _schemaManager;
+  late final PocketSyncDatabase _database;
   late PocketSyncEngine _engine;
 
   /// Initializes the PocketSync instance.
@@ -41,6 +39,10 @@ class PocketSync {
     required PocketSyncOptions options,
     required DatabaseOptions databaseOptions,
   }) async {
+    _instance._schemaManager = SchemaManager(schema: databaseOptions.schema);
+    _instance._database = PocketSyncDatabase(
+      schemaManager: _instance._schemaManager,
+    );
     await _instance._database.initialize(
       databaseOptions,
       _databaseWatcher,
@@ -48,7 +50,7 @@ class PocketSync {
     _instance._engine = PocketSyncEngine(
       _instance._database.database,
       options: options,
-      schemaManager: _schemaManager,
+      schemaManager: _instance._schemaManager,
       databaseWatcher: _databaseWatcher,
       deviceInfo: DeviceInfoPlugin(),
     );

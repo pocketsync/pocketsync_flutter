@@ -1,3 +1,4 @@
+import 'package:pocketsync_flutter/src/models/schema.dart';
 import 'package:pocketsync_flutter/src/models/sync_change.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -94,6 +95,11 @@ class DatabaseOptions {
   /// This is the path to the SQLite database file.
   final String dbPath;
 
+  /// The database schema.
+  ///
+  /// If provided, tables will be created automatically based on this schema.
+  final DatabaseSchema schema;
+
   /// A callback function to configure the database.
   ///
   /// This is called when the database is first created.
@@ -102,7 +108,8 @@ class DatabaseOptions {
   /// A callback function to create the database.
   ///
   /// This is called when the database is first created.
-  final OnDatabaseCreateFn onCreate;
+  /// If [schema] is provided, it will be used to create tables before this callback is called.
+  final OnDatabaseCreateFn? onCreate;
 
   /// A callback function to handle database version changes.
   ///
@@ -122,7 +129,8 @@ class DatabaseOptions {
   const DatabaseOptions({
     this.version = 1,
     required this.dbPath,
-    required this.onCreate,
+    required this.schema,
+    this.onCreate,
     this.onUpgrade,
     this.onConfigure,
     this.onDowngrade,

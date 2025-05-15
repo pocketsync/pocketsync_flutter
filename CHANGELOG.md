@@ -1,3 +1,7 @@
+## 0.5.0
+- Introduced schemas to define the database structure
+- Add more unit tests to make sure schema lifecycle is handled properly
+
 ## 0.4.2
 - Fix: Server connection was not properly initialized
 
