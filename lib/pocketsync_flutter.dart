@@ -17,15 +17,15 @@ export 'src/models/sync_change.dart';
 
 // Schema API - only expose what developers need to define schemas
 export 'src/models/schema.dart'
-    show 
+    show
         // Core schema classes
         TableSchema,
         DatabaseSchema,
-        
+
         // Column definition
         TableColumn,
         ColumnType,
-        
+
         // Constraints and indexes
         TableReference,
         Index;

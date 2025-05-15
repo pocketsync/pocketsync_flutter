@@ -26,7 +26,6 @@ void main() {
     late Database db;
 
     setUp(() async {
-
       final schema = DatabaseSchema(
         tables: [
           TableSchema(

@@ -38,7 +38,8 @@ void main() {
       expect(isValid, isFalse);
     });
 
-    test('validateSchema should return false for table without primary key', () {
+    test('validateSchema should return false for table without primary key',
+        () {
       // Arrange - Create a schema with a table that has no primary key
       final invalidSchema = DatabaseSchema(
         tables: [
@@ -115,7 +116,9 @@ void main() {
             ],
             indexes: [
               Index(name: 'idx_users_name', columns: ['name']),
-              Index(name: 'idx_users_NAME', columns: ['email']), // Duplicate name (case insensitive)
+              Index(
+                  name: 'idx_users_NAME',
+                  columns: ['email']), // Duplicate name (case insensitive)
             ],
           ),
         ],
@@ -148,14 +151,14 @@ void main() {
       // Assert
       final userTable = enhancedSchema.getTable('users');
       expect(userTable, isNotNull);
-      
-      final hasGlobalId = userTable!.columns.any(
-        (col) => col.name == SyncConfig.defaultGlobalIdColumnName
-      );
+
+      final hasGlobalId = userTable!.columns
+          .any((col) => col.name == SyncConfig.defaultGlobalIdColumnName);
       expect(hasGlobalId, isTrue);
-      
+
       // Should also have internal tables
-      expect(enhancedSchema.tables.length, greaterThan(originalSchema.tables.length));
+      expect(enhancedSchema.tables.length,
+          greaterThan(originalSchema.tables.length));
       expect(enhancedSchema.getTable('__pocketsync_changes'), isNotNull);
     });
   });

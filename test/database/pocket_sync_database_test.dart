@@ -62,7 +62,6 @@ void main() {
       // Initialize the database with our mock watcher
       await pocketSyncDb.initialize(options, mockDatabaseWatcher);
 
-
       for (final table in schema.tables) {
         await pocketSyncDb.execute(table.toCreateTableSql());
       }

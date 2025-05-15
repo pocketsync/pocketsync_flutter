@@ -25,13 +25,13 @@ void main() {
       // Create a unique temporary database path for each test
       final testDir = Directory.systemTemp.createTempSync('pocketsync_test_');
       dbPath = path.join(testDir.path, 'test_db.sqlite');
-      
+
       // Delete any existing database file
       final dbFile = File(dbPath);
       if (dbFile.existsSync()) {
         dbFile.deleteSync();
       }
-      
+
       // Define initial schema
       initialSchema = DatabaseSchema(
         tables: [
@@ -59,7 +59,7 @@ void main() {
     tearDown(() async {
       // Close the database after each test
       await db.close();
-      
+
       // Clean up the database file
       try {
         final dbFile = File(dbPath);
@@ -187,7 +187,7 @@ void main() {
         onUpgrade: (db, oldVersion, newVersion) async {
           // Handle schema changes
           await schemaManager.handleSchemaChanges(db);
-          
+
           // Setup change tracking again
           await schemaManager.setupChangeTracking(db);
         },
@@ -226,7 +226,7 @@ void main() {
       });
 
       // Act - Simulate multiple database upgrades (v1 -> v2 -> v3)
-      
+
       // First upgrade (v1 -> v2): Add phone column
       await db.close();
       final schemaV2 = DatabaseSchema(
@@ -242,9 +242,9 @@ void main() {
           ),
         ],
       );
-      
+
       final schemaManagerV2 = SchemaManager(schema: schemaV2);
-      
+
       db = await openDatabase(
         dbPath,
         version: 2,
@@ -254,10 +254,10 @@ void main() {
           await schemaManagerV2.handleSchemaChanges(db);
         },
       );
-      
+
       // Update data in v2
       await db.update('users', {'phone': '123-456-7890'}, where: 'id = 1');
-      
+
       // Second upgrade (v2 -> v3): Add address column and products table
       await db.close();
       final schemaV3 = DatabaseSchema(
@@ -282,9 +282,9 @@ void main() {
           ),
         ],
       );
-      
+
       final schemaManagerV3 = SchemaManager(schema: schemaV3);
-      
+
       db = await openDatabase(
         dbPath,
         version: 3,
@@ -304,18 +304,19 @@ void main() {
           }
         },
       );
-      
+
       // Assert - Check if all schema changes were applied correctly
       final userColumns = await db.rawQuery("PRAGMA table_info('users')");
-      final userColumnNames = userColumns.map((c) => c['name'] as String).toList();
-      
+      final userColumnNames =
+          userColumns.map((c) => c['name'] as String).toList();
+
       expect(userColumnNames, contains('id'));
       expect(userColumnNames, contains('name'));
       expect(userColumnNames, contains('email'));
       expect(userColumnNames, contains('phone'));
       expect(userColumnNames, contains('address'));
       expect(userColumnNames, contains(SyncConfig.defaultGlobalIdColumnName));
-      
+
       // Check if new table exists
       final tables = await db.query(
         'sqlite_master',
@@ -323,7 +324,7 @@ void main() {
       );
       final tableNames = tables.map((t) => t['name'] as String).toList();
       expect(tableNames, contains('products'));
-      
+
       // Check if data was preserved
       final users = await db.query('users');
       expect(users.length, 1);
@@ -336,16 +337,16 @@ void main() {
       // First, create the tables with the initial schema
       await schemaManager.createTablesFromSchema(db);
       await schemaManager.setupChangeTracking(db);
-      
+
       // Insert test data
       await db.insert('users', {
         'name': 'Test User',
         'email': 'test@example.com',
       });
-      
+
       // Close the database and reopen with a schema that includes the phone column
       await db.close();
-      
+
       // Define a schema with an additional column
       final enhancedSchema = DatabaseSchema(
         tables: [
@@ -360,9 +361,9 @@ void main() {
           ),
         ],
       );
-      
+
       final enhancedSchemaManager = SchemaManager(schema: enhancedSchema);
-      
+
       // Open with version 2 and add the phone column
       db = await openDatabase(
         dbPath,
@@ -372,14 +373,14 @@ void main() {
           await enhancedSchemaManager.handleSchemaChanges(db);
         },
       );
-      
+
       // Update the record to include phone
       await db.update('users', {'phone': '123-456-7890'}, where: 'id = 1');
-      
+
       // Verify the phone column was added and data was updated
       var usersWithPhone = await db.query('users');
       expect(usersWithPhone.first['phone'], '123-456-7890');
-      
+
       // Act - Simulate database downgrade (v2 -> v1)
       await db.close();
       final downgradedSchema = DatabaseSchema(
@@ -395,9 +396,9 @@ void main() {
           ),
         ],
       );
-      
+
       final downgradedSchemaManager = SchemaManager(schema: downgradedSchema);
-      
+
       db = await openDatabase(
         dbPath,
         version: 1, // Lower version
@@ -408,16 +409,16 @@ void main() {
           await downgradedSchemaManager.setupChangeTracking(db);
         },
       );
-      
+
       // Assert - Check if database is still functional
       final users = await db.query('users');
       expect(users.length, 1);
       expect(users.first['name'], 'Test User');
       expect(users.first['email'], 'test@example.com');
-      
+
       // The phone column might still exist since SQLite doesn't support dropping columns,
       // but our schema doesn't reference it anymore
-      
+
       // Verify change tracking is still working
       await db.update('users', {'name': 'Updated Name'}, where: 'id = 1');
       final changes = await db.query('__pocketsync_changes');
@@ -428,28 +429,29 @@ void main() {
       // Arrange - Create initial schema
       await schemaManager.createTablesFromSchema(db);
       await schemaManager.setupChangeTracking(db);
-      
+
       // Get initial triggers
       final initialTriggers = await db.query(
         'sqlite_master',
         where: "type = 'trigger' AND tbl_name = 'users'",
       );
-      
+
       // Act - Simulate schema change that should recreate triggers
       await schemaManager.handleSchemaChanges(db);
-      
+
       // Assert - Check if triggers were recreated
       final updatedTriggers = await db.query(
         'sqlite_master',
         where: "type = 'trigger' AND tbl_name = 'users'",
       );
-      
+
       // Should have the same number of triggers
       expect(updatedTriggers.length, initialTriggers.length);
-      
+
       // Verify triggers are working by inserting data
-      await db.insert('users', {'name': 'Trigger Test', 'email': 'trigger@example.com'});
-      
+      await db.insert(
+          'users', {'name': 'Trigger Test', 'email': 'trigger@example.com'});
+
       final changes = await db.query('__pocketsync_changes');
       expect(changes.isNotEmpty, isTrue);
       expect(changes.first['operation'], 'INSERT');
@@ -459,19 +461,20 @@ void main() {
 
   group('Database Options Lifecycle Tests', () {
     late String optionsDbPath;
-    
+
     setUp(() {
       // Create a unique temporary database path for this test group
-      final testDir = Directory.systemTemp.createTempSync('pocketsync_options_test_');
+      final testDir =
+          Directory.systemTemp.createTempSync('pocketsync_options_test_');
       optionsDbPath = path.join(testDir.path, 'options_test_db.sqlite');
-      
+
       // Delete any existing database file
       final dbFile = File(optionsDbPath);
       if (dbFile.existsSync()) {
         dbFile.deleteSync();
       }
     });
-    
+
     tearDown(() {
       // Clean up the database file
       try {
@@ -483,8 +486,9 @@ void main() {
         // Ignore cleanup errors
       }
     });
-    
-    test('should properly initialize database with schema in options', () async {
+
+    test('should properly initialize database with schema in options',
+        () async {
       // Arrange
       final schema = DatabaseSchema(
         tables: [
@@ -504,13 +508,13 @@ void main() {
           ),
         ],
       );
-      
+
       final options = DatabaseOptions(
         dbPath: optionsDbPath,
         version: 1,
         schema: schema,
       );
-      
+
       // Act - Initialize database with options
       final db = await databaseFactory.openDatabase(
         options.dbPath,
@@ -524,34 +528,34 @@ void main() {
           },
         ),
       );
-      
+
       // Assert - Check if tables were created correctly
       final tables = await db.query(
         'sqlite_master',
         where: "type = 'table'",
       );
       final tableNames = tables.map((t) => t['name'] as String).toList();
-      
+
       expect(tableNames, contains('todos'));
-      
+
       // Check if columns were created
       final columns = await db.rawQuery("PRAGMA table_info('todos')");
       final columnNames = columns.map((c) => c['name'] as String).toList();
-      
+
       expect(columnNames, contains('id'));
       expect(columnNames, contains('title'));
       expect(columnNames, contains('isCompleted'));
       expect(columnNames, contains(SyncConfig.defaultGlobalIdColumnName));
-      
+
       // Check if index was created
       final indexes = await db.query(
         'sqlite_master',
         where: "type = 'index' AND tbl_name = 'todos'",
       );
       final indexNames = indexes.map((i) => i['name'] as String).toList();
-      
+
       expect(indexNames, contains('idx_todos_title'));
-      
+
       // Clean up
       await db.close();
     });

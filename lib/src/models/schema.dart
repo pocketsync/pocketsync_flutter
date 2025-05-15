@@ -46,15 +46,15 @@ class TableReference {
   /// @nodoc
   String toSql() {
     final buffer = StringBuffer('REFERENCES $table($column)');
-    
+
     if (onDelete != null) {
       buffer.write(' ON DELETE $onDelete');
     }
-    
+
     if (onUpdate != null) {
       buffer.write(' ON UPDATE $onUpdate');
     }
-    
+
     return buffer.toString();
   }
 
@@ -69,7 +69,8 @@ class TableReference {
   }
 
   @override
-  int get hashCode => table.hashCode ^ column.hashCode ^ onDelete.hashCode ^ onUpdate.hashCode;
+  int get hashCode =>
+      table.hashCode ^ column.hashCode ^ onDelete.hashCode ^ onUpdate.hashCode;
 }
 
 /// Represents a column in a database table.
@@ -407,17 +408,18 @@ class Index {
   /// @nodoc
   String toSql(String tableName) {
     final buffer = StringBuffer('CREATE');
-    
+
     if (isUnique) {
       buffer.write(' UNIQUE');
     }
-    
-    buffer.write(' INDEX IF NOT EXISTS $name ON $tableName (${columns.join(', ')})');
-    
+
+    buffer.write(
+        ' INDEX IF NOT EXISTS $name ON $tableName (${columns.join(', ')})');
+
     if (where != null) {
       buffer.write(' WHERE $where');
     }
-    
+
     return buffer.toString();
   }
 
@@ -516,33 +518,36 @@ class TableSchema {
 
   /// @nodoc
   String _createVirtualTableSql() {
-    final buffer = StringBuffer('CREATE VIRTUAL TABLE IF NOT EXISTS $name USING $module');
-    
+    final buffer =
+        StringBuffer('CREATE VIRTUAL TABLE IF NOT EXISTS $name USING $module');
+
     if (moduleArgs != null && moduleArgs!.isNotEmpty) {
       buffer.write('(${moduleArgs!.join(', ')})');
     }
-    
+
     return buffer.toString();
   }
 
   /// @nodoc
   String _createRegularTableSql() {
     final buffer = StringBuffer('CREATE TABLE IF NOT EXISTS $name (\n');
-    
+
     // Add columns
-    final columnDefinitions = columns.map((column) => '  ${column.toSql()}').join(',\n');
+    final columnDefinitions =
+        columns.map((column) => '  ${column.toSql()}').join(',\n');
     buffer.write(columnDefinitions);
-    
+
     // Add table constraints if needed
     final primaryKeys = primaryKeyColumns;
     if (primaryKeys.length > 1) {
       // Composite primary key
-      final primaryKeyColumns = primaryKeys.map((column) => column.name).join(', ');
+      final primaryKeyColumns =
+          primaryKeys.map((column) => column.name).join(', ');
       buffer.write(',\n  PRIMARY KEY ($primaryKeyColumns)');
     }
-    
+
     buffer.write('\n)');
-    
+
     return buffer.toString();
   }
 
@@ -609,22 +614,22 @@ class DatabaseSchema {
 class Trigger {
   /// The name of the trigger.
   final String name;
-  
+
   /// The table the trigger is associated with.
   final String tableName;
-  
+
   /// The event that activates the trigger (INSERT, UPDATE, DELETE).
   final String event;
-  
+
   /// The timing of the trigger (BEFORE, AFTER, INSTEAD OF).
   final String timing;
-  
+
   /// Optional condition for the trigger.
   final String? when;
-  
+
   /// The SQL statements to execute when the trigger is activated.
   final List<String> statements;
-  
+
   /// Creates a new trigger.
   const Trigger({
     required this.name,
@@ -634,22 +639,22 @@ class Trigger {
     this.when,
     required this.statements,
   });
-  
+
   /// Converts the trigger to SQL.
   String toSql() {
     final buffer = StringBuffer('CREATE TRIGGER IF NOT EXISTS $name\n');
     buffer.write('$timing $event ON $tableName\n');
-    
+
     if (when != null && when!.isNotEmpty) {
       buffer.write('WHEN $when\n');
     }
-    
+
     buffer.write('BEGIN\n');
     for (final statement in statements) {
       buffer.write('  $statement\n');
     }
     buffer.write('END;');
-    
+
     return buffer.toString();
   }
 }

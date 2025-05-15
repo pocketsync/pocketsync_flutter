@@ -104,14 +104,14 @@ class SchemaProcessor {
   }
 
   /// Perform validation on schema to ensure it meets requirements for PocketSync.
-  /// 
+  ///
   /// This method checks for common issues in the schema definition that might
   /// cause problems during synchronization, such as:
   /// - Tables without primary keys
   /// - Reserved column names
   /// - Unsupported column types
   /// - Naming conflicts with internal tables
-  /// 
+  ///
   /// Returns true if the schema is valid, false otherwise.
   /// Logs specific validation errors to help with debugging.
   static bool validateSchema(DatabaseSchema schema) {
@@ -119,7 +119,7 @@ class SchemaProcessor {
       Logger.log('Schema validation failed: No tables defined in schema');
       return false;
     }
-    
+
     bool isValid = true;
     final reservedColumnNames = [
       SyncConfig.defaultGlobalIdColumnName,
@@ -128,64 +128,73 @@ class SchemaProcessor {
       'oid', // SQLite internal
       '_rowid_', // SQLite internal
     ];
-    
+
     final reservedTablePrefixes = [
       '__pocketsync',
       'sqlite_',
       'android_',
     ];
-    
+
     // Check each user table
     for (final table in getUserTables(schema)) {
       // Check for reserved table names
       for (final prefix in reservedTablePrefixes) {
         if (table.name.startsWith(prefix)) {
-          Logger.log('Schema validation warning: Table ${table.name} uses reserved prefix $prefix');
+          Logger.log(
+              'Schema validation warning: Table ${table.name} uses reserved prefix $prefix');
           isValid = false;
         }
       }
-      
+
       // Check if table has a primary key
       final hasPrimaryKey = table.columns.any((col) => col.isPrimaryKey);
       if (!hasPrimaryKey) {
-        Logger.log('Schema validation failed: Table ${table.name} has no primary key');
+        Logger.log(
+            'Schema validation failed: Table ${table.name} has no primary key');
         isValid = false;
       }
-      
+
       // Check column names and types
       for (final column in table.columns) {
         // Check for reserved column names
-        if (reservedColumnNames.contains(column.name.toLowerCase()) && 
+        if (reservedColumnNames.contains(column.name.toLowerCase()) &&
             column.name != 'id' && // Allow 'id' as it's commonly used as PK
-            column.name != SyncConfig.defaultGlobalIdColumnName) { // Allow global ID if explicitly defined
-          Logger.log('Schema validation warning: Column ${column.name} in table ${table.name} uses reserved name');
+            column.name != SyncConfig.defaultGlobalIdColumnName) {
+          // Allow global ID if explicitly defined
+          Logger.log(
+              'Schema validation warning: Column ${column.name} in table ${table.name} uses reserved name');
         }
-        
+
         // Check for unsupported column types or configurations
         if (column.type == ColumnType.blob && column.isPrimaryKey) {
-          Logger.log('Schema validation warning: BLOB type not recommended for primary key in ${table.name}.${column.name}');
+          Logger.log(
+              'Schema validation warning: BLOB type not recommended for primary key in ${table.name}.${column.name}');
         }
       }
-      
+
       // Check for duplicate column names (case insensitive in SQLite)
-      final columnNames = table.columns.map((c) => c.name.toLowerCase()).toList();
+      final columnNames =
+          table.columns.map((c) => c.name.toLowerCase()).toList();
       final uniqueColumnNames = columnNames.toSet().toList();
       if (columnNames.length != uniqueColumnNames.length) {
-        Logger.log('Schema validation failed: Table ${table.name} has duplicate column names (SQLite is case-insensitive)');
+        Logger.log(
+            'Schema validation failed: Table ${table.name} has duplicate column names (SQLite is case-insensitive)');
         isValid = false;
       }
-      
+
       // Check for duplicate index names
       if (table.indexes.isNotEmpty) {
-        final indexNames = table.indexes.map((i) => i.name.toLowerCase()).toList();
+        final indexNames =
+            table.indexes.map((i) => i.name.toLowerCase()).toList();
         final uniqueIndexNames = indexNames.toSet().toList();
         if (indexNames.length != uniqueIndexNames.length) {
-          Logger.log('Schema validation failed: Table ${table.name} has duplicate index names');
+          Logger.log(
+              'Schema validation failed: Table ${table.name} has duplicate index names');
           isValid = false;
         }
       }
     }
-    
+
     return isValid;
   }
 

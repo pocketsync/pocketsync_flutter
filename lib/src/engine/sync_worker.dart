@@ -149,7 +149,7 @@ class SyncWorker {
         if (_syncQueue.hasDownloads) {
           await _processDownloads(since: await getLastDownloadTimestamp());
         }
-      } 
+      }
     } finally {
       _isSyncing = false;
     }
