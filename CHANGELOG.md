@@ -1,3 +1,6 @@
+## 0.5.1
+- Updated readme
+
 ## 0.5.0
 - Introduced schemas to define the database structure
 - Add more unit tests to make sure schema lifecycle is handled properly

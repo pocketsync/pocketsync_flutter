@@ -64,16 +64,18 @@ Future<void> initPocketSync() async {
     databaseOptions: DatabaseOptions(
       dbPath: dbPath,
       version: 1,
-      onCreate: (db, version) async {
-        // Create your database tables
-        await db.execute('''
-          CREATE TABLE todos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            isCompleted INTEGER
-          )
-        ''');
-      },
+      schema: DatabaseSchema(
+        tables: [
+          TableSchema(
+            name: 'todos',
+            columns: [
+              TableColumn.primaryKey(name: 'id', type: ColumnType.INTEGER),
+              TableColumn.text(name: 'title'),
+              TableColumn.boolean(name: 'isCompleted'),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 
@@ -190,6 +192,10 @@ await PocketSync.instance.dispose();
 ```
 
 ## Migration
+
+### From 0.4.2 to 0.5.0
+
+- PocketSync now uses the new schema system to define your database schema. This change is interesting because it enables a set of features that were not possible before. Our your end, it helps you to define your database schema in a more type-safe way.
 
 ### From 0.2.0 to 0.3.0
 
